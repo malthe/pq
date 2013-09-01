@@ -78,7 +78,7 @@ class Queue(object):
     def __len__(self):
         with self._transaction() as cursor:
             cursor.execute(
-                "SELECT COUNT(*) FROM %s WHERE q_name = %s AND NOT processed",
+                "SELECT COUNT(*) FROM %s WHERE q_name = %s AND dequeued IS NULL",
                 (self.table, self.name)
             )
 
@@ -135,7 +135,7 @@ class Queue(object):
     def _pull_row(self, cursor):
         cursor.execute(
             "SELECT id, data FROM %s WHERE q_name = %s "
-            "AND NOT processed "
+            "AND dequeued IS NULL "
             "AND pg_try_advisory_xact_lock(id) FOR UPDATE LIMIT 1;",
             (self.table, self.name)
         )
@@ -145,7 +145,7 @@ class Queue(object):
             return
 
         cursor.execute(
-            "UPDATE %s SET processed = true WHERE id = %s;",
+            "UPDATE %s SET dequeued = current_timestamp WHERE id = %s",
             (self.table, row[0])
         )
 
