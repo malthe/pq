@@ -2,13 +2,21 @@ The library expects a connection implementation which is compatible
 with the ``psycopg2`` library, e.g. `psycopg2cffi
 <https://pypi.python.org/pypi/psycopg2cffi>`_.
 
-The library is similar to Ryan Smith's `queue_classic
+The implementation is similar to Ryan Smith's `queue_classic
 <https://github.com/ryandotsmith/queue_classic>`_ library written in
 Ruby, but uses `advisory locks
 <http://www.postgresql.org/docs/current/static/explicit-locking.html#ADVISORY-LOCKS>`_
-for concurrency control 
+for concurrency control.
 
-Setup:
+
+Getting started
+===============
+
+All functionality is encapsulated in a single class ``Manager``.
+
+     ``class Manager(conn=None, pool=None, table="queue", debug=False)``
+
+Example usage:
 
 ::
 
@@ -16,37 +24,59 @@ Setup:
     from pq import Manager
 
     conn = connect("dbname=example user=postgres")
+    manager = Manager(conn)
 
-    # In the following we pass an already established connection, but
-    # we can also provide a connection pool using the ``pool``
-    # keyword.
-    manager = Manager(conn, table="queue")
+To prepare the database, you can call the ``install()`` method. It
+creates the queue table and adds an insert trigger.
+
+::
 
     # Create tables and configure trigger.
     manager.install()
 
-    # Define queue. Note that queues are implicitly defined by the
-    # items that are put into it. That is, an empty queue exists only
-    # in Python.
-    queue = manager["apples"]
 
-Usage:
+Queues
+======
+
+The manager exposes queues as a dictionary interface:
 
 ::
 
-    # Insert JSON-compatible objects:
-    queue.put({'foo': 'bar'})
+    queue = manager["apples"]
 
-    # Retrieve using either blocking or non-blocking call (the default
-    # call is blocking; for a non-blocking call, pass a false value).
-    item = queue.get()
+Use the ``put(data)`` method to insert items into the queue. It takes a
+JSON-compatible object, e.g. a ``dict``.
 
-    # Iterate through queue and pull items out. This iterator blocks
-    # until a timeout after which it returns a null item.
-    for item in queue:
-        if item is None:
+::
+
+    queue.put({'type': 'Cox'})
+    queue.put({'type': 'Arthur Turner'})
+    queue.put({'type': 'Golden Delicious'})
+
+Items are pulled out of the queue using ``get(block=True)``. The
+default behavior is to block until an item is available.
+
+::
+
+    apple = queue.get()
+
+Alternatively, there's an iterator interface available.
+
+::
+
+    for apple in queue:
+        if apple is None:
             break
 
-The ``Queue`` object returned by the manager is thread-safe. The
-implementation uses the event notification system built into
-PostgreSQL to block on item retrieval without polling.
+        apple.eat()
+
+The iterator blocks if no item is available. Importantly, there is a
+default timeout of one second, after which the iterator yields a value
+of ``None``.
+
+
+Thread-safety
+=============
+
+All objects are thread-safe as long as a connection pool is provided
+where each thread receives its own database connection.
