@@ -32,6 +32,9 @@ class Manager(object):
                 name, Queue(name, *self.params[0], **self.params[1])
             )
 
+    def close(self):
+        conn = self[None].close()
+
     def install(self, table='queue'):
         conn = self[None]._conn()
         sql = _read_sql('create')
@@ -63,17 +66,13 @@ class Queue(object):
 
     def __iter__(self):
         while True:
-            self._listen()
             with self._transaction() as cursor:
-                data = self._pull_row(cursor)
+                data = self._pull_row(cursor, True)
 
-            if data is None:
-                if not self._select(self.timeout):
-                    yield None
-                    continue
-            else:
-                self._unlisten()
-                yield data
+            if data is None and self._select(self.timeout):
+                continue
+
+            yield data
 
     def __len__(self):
         with self._transaction() as cursor:
@@ -84,21 +83,21 @@ class Queue(object):
 
             return cursor.fetchone()[0]
 
+    def close(self):
+        if self.conn is not None:
+            self.conn.close()
+        else:
+            self.pool.closeall()
+
     def get(self, block=True):
-        if block:
-            self._listen()
+        while True:
+            with self._transaction() as cursor:
+                data = self._pull_row(cursor, block)
 
-        with self._transaction() as cursor:
-            while True:
-                data = self._pull_row(cursor)
-                if data is not None or not block:
-                    break
+            if data is not None or not block:
+                return data
 
-                if not self._select(self.timeout):
-                    continue
-
-            if block:
-                self._unlisten()
+            self._select(self.timeout)
 
         return data
 
@@ -124,15 +123,13 @@ class Queue(object):
             return self.pool.getconn(ident)
         return self.conn
 
-    def _listen(self):
-        with self._transaction() as cursor:
-            cursor.execute("LISTEN %s", (Literal(self.name), ))
+    def _cursor(self):
+        return self._conn().cursor(cursor_factory=self.cursor_factory)
 
-    def _unlisten(self):
-        with self._transaction() as cursor:
-            cursor.execute("UNLISTEN %s", (Literal(self.name), ))
+    def _listen(self, cursor):
+        cursor.execute("LISTEN %s", (Literal(self.name), ))
 
-    def _pull_row(self, cursor):
+    def _pull_row(self, cursor, blocking):
         cursor.execute(
             "SELECT id, data FROM %s WHERE q_name = %s "
             "AND dequeued IS NULL "
@@ -142,6 +139,8 @@ class Queue(object):
 
         row = cursor.fetchone()
         if row is None:
+            if blocking:
+                self._listen(cursor)
             return
 
         cursor.execute(

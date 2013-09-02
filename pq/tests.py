@@ -1,24 +1,39 @@
+import sys
+
+from itertools import chain
 from time import time, sleep
 from unittest import TestCase
-from logging import getLogger, StreamHandler, DEBUG
+from logging import getLogger, StreamHandler, INFO
 from threading import Event, Thread, current_thread
 from psycopg2cffi.pool import ThreadedConnectionPool
+from psycopg2cffi import ProgrammingError
 
 # Set up logging such that we can quickly enable logging for a
 # particular queue instance (via the `logging` flag).
-getLogger('pq').setLevel(DEBUG)
+getLogger('pq').setLevel(INFO)
 getLogger('pq').addHandler(StreamHandler())
 
 
 class QueueTest(TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpClass(cls):
         pool = ThreadedConnectionPool(
             10, 100, "dbname=pq_test user=postgres"
         )
-        self.queues = []
         from pq import Manager
-        self.manager = Manager(pool=pool, table="queue")
-        self.manager.install()
+        cls.manager = Manager(pool=pool, table="queue")
+
+        try:
+            cls.manager.install()
+        except ProgrammingError:
+            pass
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.manager.close()
+
+    def setUp(self):
+        self.queues = []
 
     def tearDown(self):
         for queue in self.queues:
@@ -108,32 +123,73 @@ class QueueTest(TestCase):
         queue.get()
         self.assertEqual(len(queue), 1)
 
-    def test_producer_consumer_threaded(self):
-        queue = self.make_one("test")
-        data = {'foo': 'bar'}
+    def test_benchmark(self, items=4000, c=4):
+        queue = self.make_one("benchmark")
+
         event = Event()
+
+        def consumer(consumed):
+            event.wait()
+            for item in queue:
+                if item is None:
+                    break
+                consumed.append(item)
+
+        def producer():
+            event.wait()
+            i = 0
+            while True:
+                queue.put({})
+                i += 1
+                if i > items / c:
+                    break
+
+        cs = [[] for i in xrange(c * 2)]
+
+        threads = (
+            [Thread(target=producer) for i in xrange(c)],
+            [Thread(target=consumer, args=(cs[i], )) for i in xrange(c * 2)],
+        )
+
+        for thread in chain(*threads):
+            thread.start()
+
+        event.set()
+        t = time()
+
+        for thread in chain(*threads):
+            thread.join()
+
+        elapsed = time() - t
+        consumed = sum(map(len, cs))
+
+        sys.stderr.write("complete.\n>>> stats: %s ... " % ("; ".join(
+            "%s: %s" % item for item in (
+                ("consumed", consumed),
+                ("remaining", len(queue)),
+                ("throughput", "%.1f items / sec" % (consumed / elapsed)),
+            ))))
+
+    def test_producer_consumer_threaded(self, c=5):
+        queue = self.make_one("test")
 
         def producer():
             ident = current_thread().ident
             for i in xrange(100):
-                sleep(0.01)
-                d = dict(data)
-                d['id'] = ident, i
-                queue.put(d)
+                queue.put((ident, i))
 
         consumed = []
 
         def consumer():
             while True:
                 for d in queue:
-                    consumed.append(
-                        tuple(d['id']) if d is not None else None
-                    )
-                    if event.is_set():
+                    if d is None:
                         return
 
-        producers = [Thread(target=producer) for i in xrange(5)]
-        consumers = [Thread(target=consumer) for i in xrange(5)]
+                    consumed.append(tuple(d))
+
+        producers = [Thread(target=producer) for i in xrange(c * 2)]
+        consumers = [Thread(target=consumer) for i in xrange(c)]
 
         for t in producers:
             t.start()
@@ -143,8 +199,6 @@ class QueueTest(TestCase):
 
         for t in producers:
             t.join()
-
-        event.set()
 
         for t in consumers:
             t.join()

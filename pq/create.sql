@@ -1,18 +1,18 @@
 do $$ begin
 
-CREATE TABLE IF NOT EXISTS %(name)s (
-  id       bigserial PRIMARY KEY,
+CREATE TABLE %(name)s (
+  id       bigserial   PRIMARY KEY,
   enqueued timestamptz NOT NULL DEFAULT current_timestamp,
   dequeued timestamptz,
-  q_name   text NOT NULL CHECK (length(q_name) > 0),
-  data     json NOT NULL
+  q_name   text        NOT NULL CHECK (length(q_name) > 0),
+  data     json        NOT NULL
 );
 
 end $$ language plpgsql;
 
 drop function if exists pq_notify() cascade;
 
-create or replace function pq_notify() returns trigger as $$ begin
+create function pq_notify() returns trigger as $$ begin
   perform pg_notify(new.q_name, '');
   return null;
 end $$ language plpgsql;
