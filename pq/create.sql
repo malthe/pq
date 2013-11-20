@@ -1,14 +1,20 @@
 do $$ begin
 
 CREATE TABLE %(name)s (
-  id       bigserial   PRIMARY KEY,
-  enqueued timestamptz NOT NULL DEFAULT current_timestamp,
-  dequeued timestamptz,
-  q_name   text        NOT NULL CHECK (length(q_name) > 0),
-  data     json        NOT NULL
+  id          bigserial    PRIMARY KEY,
+  enqueued_at timestamptz  NOT NULL DEFAULT current_timestamp,
+  dequeued_at timestamptz,
+  expected_at timestamptz,
+  schedule_at timestamptz,
+  q_name      text         NOT NULL CHECK (length(q_name) > 0),
+  data        json         NOT NULL
 );
 
 end $$ language plpgsql;
+
+create index priority_idx on %(name)s
+    (schedule_at nulls first, expected_at nulls first)
+    where dequeued_at is null;
 
 drop function if exists pq_notify() cascade;
 
