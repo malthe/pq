@@ -46,8 +46,10 @@ class QueueTest(TestCase):
 
         try:
             cls.pq.create()
-        except ProgrammingError:
-            pass
+        except ProgrammingError as exc:
+            # We ignore a duplicate table error.
+            if exc.pgcode != '42P07':
+                raise
 
     @classmethod
     def tearDownClass(cls):
