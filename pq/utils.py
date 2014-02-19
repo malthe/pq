@@ -1,9 +1,13 @@
+import re
+
 from contextlib import contextmanager
 from functools import wraps
 from textwrap import dedent
 from logging import getLogger
 
 logger = getLogger("pq")
+
+_re_format = re.compile(r'%\(([a-z]+)\)[a-z]')
 
 
 def prepared(f):
@@ -22,32 +26,36 @@ def prepared(f):
     """
 
     d = dedent(f.__doc__.split('\n', 1)[1])
-    name = f.__name__
     query = "\n".join(
         line for line in d.split('\n')
         if line.startswith("    ")
     ) or d
-    query = "PREPARE %(statement_name)s AS\n" + query
-    arg_count = query.count("$")
 
+    arg_count = query.count("$")
     if arg_count:
-        statement = "EXECUTE %s (%s)" % (
-            name, ", ".join("%s" for i in range(arg_count)))
+        fargs = "(" + ", ".join(["%s"] * arg_count) + ")"
     else:
-        statement = "EXECUTE %s" % name
+        fargs = None
+
+    fname = f.__name__
+    for m in _re_format.finditer(query):
+        fname += "_%%(%s)s" % m.group(1)
 
     @wraps(f)
     def wrapper(self, cursor, *args):
         conn = cursor.connection
+        name = fname % self.__dict__
         key = "_prepared_%s" % name
 
         if not hasattr(conn, key):
             setattr(conn, key, None)
             d = self.__dict__.copy()
-            d['statement_name'] = Literal(name)
-            cursor.execute(query, d)
+            cursor.execute("PREPARE %s AS\n%s" % (name, query), d)
 
         params = args[:arg_count]
+        statement = "EXECUTE " + name
+        if fargs is not None:
+            statement += " " + fargs
         cursor.execute(statement, params or None)
         return f(self, cursor, *args[arg_count:])
 

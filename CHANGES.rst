@@ -5,6 +5,8 @@ In next release ...
 
 Bugs:
 
+- The same connection pool can now be used with different queues.
+
 - The transaction manager now correctly returns connections to the
   pool.
 
