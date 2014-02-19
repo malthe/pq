@@ -147,7 +147,21 @@ class QueueTest(TestCase):
         thread.start()
         t = time()
         self.assertEqual(queue.get(), {'foo': 'bar'})
-        self.assertGreater(time() - t, 0.1)
+        self.assertLess(time() - t, 1.0)
+        thread.join()
+
+    def test_get_empty_thread_puts_after_timeout(self):
+        queue = self.make_one("test")
+
+        def target():
+            sleep(1.2)
+            queue.put({'foo': 'bar'})
+
+        thread = Thread(target=target)
+        thread.start()
+        t = time()
+        self.assertEqual(queue.get(), None)
+        self.assertGreater(time() - t, 1.0)
         thread.join()
 
     def test_get_empty_non_blocking_thread_puts(self):
