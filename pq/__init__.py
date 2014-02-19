@@ -14,14 +14,12 @@ from .utils import (
 )
 
 
-def _read_sql(name, path=os.path.dirname(__file__)):
-    return open(os.path.join(path, '%s.sql' % name), 'r').read()
-
-
 class PQ(object):
     """Convenient queue manager."""
 
     table = 'queue'
+
+    template_path = os.path.dirname(__file__)
 
     def __init__(self, *args, **kwargs):
         self.params = args, kwargs
@@ -40,7 +38,9 @@ class PQ(object):
 
     def create(self):
         queue = self['']
-        sql = _read_sql('create')
+
+        with open(os.path.join(self.template_path, 'create.sql'), 'r') as f:
+            sql = f.read()
 
         with queue._transaction() as cursor:
             cursor.execute(sql, {'name': Literal(queue.table)})
