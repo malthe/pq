@@ -33,10 +33,13 @@ class LoggingCursor(cursor):
 
 
 class QueueTest(TestCase):
+    base_concurrency = 4
+
     @classmethod
     def setUpClass(cls):
+        c = cls.base_concurrency * 4
         pool = cls.pool = ThreadedConnectionPool(
-            25, 100, "dbname=pq_test user=postgres"
+            c, c, "dbname=pq_test user=postgres"
         )
         from pq import PQ
         cls.pq = PQ(pool=pool, table="queue")
@@ -218,7 +221,7 @@ class QueueTest(TestCase):
         queue.get()
         self.assertEqual(len(queue), 1)
 
-    def test_benchmark(self, items=1000, c=4):
+    def test_benchmark(self, items=1000):
         if not os.environ.get("BENCHMARK"):
             raise SkipTest
 
@@ -235,10 +238,10 @@ class QueueTest(TestCase):
             for i in xrange(iterations):
                 queue.put({})
 
-        for i in range(c):
+        for i in xrange(self.base_concurrency):
             Thread(target=put).start()
 
-        while len(threads) < c:
+        while len(threads) < self.base_concurrency:
             sleep(0.01)
 
         t = time()
@@ -248,7 +251,7 @@ class QueueTest(TestCase):
             threads.pop().join()
 
         elapsed = time() - t
-        put_throughput = iterations * c / elapsed
+        put_throughput = iterations * self.base_concurrency / elapsed
         event.clear()
 
         # Queue.get
@@ -261,10 +264,10 @@ class QueueTest(TestCase):
                 if item is None:
                     break
 
-        for i in range(c):
+        for i in xrange(self.base_concurrency):
             Thread(target=get).start()
 
-        while len(threads) < c:
+        while len(threads) < self.base_concurrency:
             sleep(0.1)
 
         t = time()
@@ -274,7 +277,7 @@ class QueueTest(TestCase):
             threads.pop().join()
 
         elapsed = time() - t
-        get_throughput = iterations * c / elapsed
+        get_throughput = iterations * self.base_concurrency / elapsed
         event.clear()
 
         # Queue.__iter__
@@ -285,7 +288,7 @@ class QueueTest(TestCase):
             while True:
                 queue.put({})
                 i += 1
-                if i > items / c:
+                if i > items / self.base_concurrency:
                     break
 
         def consumer(consumed):
@@ -300,6 +303,7 @@ class QueueTest(TestCase):
 
         # Use a trial run to warm up JIT (when using PyPy).
         warmup = '__pypy__' in sys.builtin_module_names
+        c = self.base_concurrency
 
         for x in xrange(1 + int(warmup)):
             cs = [[] for i in xrange(c * 2)]
@@ -339,7 +343,7 @@ class QueueTest(TestCase):
                 ("put       ", "%d items/s" % (put_throughput)),
             ))))
 
-    def test_producer_consumer_threaded(self, c=5):
+    def test_producer_consumer_threaded(self):
         queue = self.make_one("test")
 
         def producer():
@@ -357,6 +361,7 @@ class QueueTest(TestCase):
 
                     consumed.append(tuple(d))
 
+        c = self.base_concurrency
         producers = [Thread(target=producer) for i in xrange(c * 2)]
         consumers = [Thread(target=consumer) for i in xrange(c)]
 
