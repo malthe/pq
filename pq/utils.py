@@ -77,15 +77,13 @@ def transaction(conn, **kwargs):
     cursor = conn.cursor(**kwargs)
 
     try:
-        try:
-            yield cursor
-        finally:
-            cursor.close()
+        yield cursor
+        conn.commit()
     except Exception:
         conn.rollback()
         raise
-    else:
-        conn.commit()
+    finally:
+        cursor.close()
 
     for notice in cursor.connection.notices:
         logger.warn(notice)
