@@ -2,9 +2,9 @@ import os
 import re
 import cPickle as pickle
 
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 from select import select
-from threading import current_thread
 from logging import getLogger
 from weakref import WeakValueDictionary
 
@@ -62,11 +62,11 @@ class PQ(object):
         self[''].close()
 
     def create(self):
-        q = self['']
-        conn = q._conn()
+        queue = self['']
         sql = _read_sql('create')
-        with transaction(conn) as cursor:
-            cursor.execute(sql, {'name': Literal(q.table)})
+
+        with queue._transaction() as cursor:
+            cursor.execute(sql, {'name': Literal(queue.table)})
 
 
 class NotYet(Exception):
@@ -198,11 +198,14 @@ class Queue(object):
                 (self.table, self.name),
             )
 
+    @contextmanager
     def _conn(self):
         if self.pool:
-            ident = (current_thread().ident, self.name, self.table)
-            return self.pool.getconn(ident)
-        return self.conn
+            conn = self.pool.getconn()
+            yield conn
+            self.pool.putconn(conn)
+        else:
+            yield self.conn
 
     def _listen(self, cursor):
         cursor.execute("LISTEN %s", (Literal(self.name), ))
@@ -275,11 +278,17 @@ class Queue(object):
         return cursor.fetchone()[0]
 
     def _select(self, timeout):
-        r, w, x = select([self._conn()], [], [], timeout)
+        with self._conn() as conn:
+            fd = conn.fileno()
+            r, w, x = select([fd], [], [], timeout)
         has_data = bool(r or w or x)
         if not has_data:
             self.logger.debug("timeout (%.3f seconds)." % timeout)
         return has_data
 
+    @contextmanager
     def _transaction(self):
-        return transaction(self._conn(), cursor_factory=self.cursor_factory)
+        with self._conn() as conn, \
+            transaction(
+                conn, cursor_factory=self.cursor_factory) as cursor:
+            yield cursor
