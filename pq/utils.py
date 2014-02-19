@@ -65,13 +65,13 @@ def prepared(f):
 @contextmanager
 def transaction(conn, **kwargs):
     """Context manager.
-    Executes block inside DB transaction. Returns cursor.
-    At the end of the block, the connection is returned to pool.
 
-    >>> with transaction() as cursor:
-    ...     rows = cursor.execute(...).fetchall()
-    ...     process(rows)
+    Execute statements within a transaction.
+
+    >>> with transaction(conn) as cursor:
     ...     cursor.execute(...)
+    ...     return cursor.fetchall()
+
     """
 
     cursor = conn.cursor(**kwargs)
