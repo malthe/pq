@@ -4,10 +4,15 @@ from contextlib import contextmanager
 from functools import wraps
 from textwrap import dedent
 from logging import getLogger
+from datetime import (
+    datetime, timedelta
+)
 
 logger = getLogger("pq")
 
 _re_format = re.compile(r'%\(([a-z]+)\)[a-z]')
+_re_timedelta = re.compile(r'(\d+)([smhd])')
+_timedelta_table = dict(s='seconds', m='minutes', h='hours', d='days')
 
 
 def prepared(f):
@@ -60,6 +65,26 @@ def prepared(f):
         return f(self, cursor, *args[arg_count:])
 
     return wrapper
+
+
+def convert_time_spec(spec):
+    if spec is None:
+        return
+
+    if isinstance(spec, basestring):
+        m = _re_timedelta.match(spec)
+        if m is None:
+            raise ValueError(spec)
+
+        g = m.groups()
+        val = int(g[0])
+        key = _timedelta_table.get(g[1])
+        spec = timedelta(**{key: val})
+
+    if isinstance(spec, timedelta):
+        spec = datetime.utcnow() + spec
+
+    return spec
 
 
 @contextmanager

@@ -1,44 +1,21 @@
 import os
-import re
 import cPickle as pickle
 
 from contextlib import contextmanager
-from datetime import datetime, timedelta
+from datetime import datetime
 from select import select
 from logging import getLogger
 from weakref import WeakValueDictionary
 
 from json import dumps
 
-from .utils import Literal, prepared, transaction
-
-
-_re_timedelta = re.compile(r'(\d+)([smhd])')
-_timedelta_table = dict(s='seconds', m='minutes', h='hours', d='days')
+from .utils import (
+    Literal, prepared, transaction, convert_time_spec
+)
 
 
 def _read_sql(name, path=os.path.dirname(__file__)):
     return open(os.path.join(path, '%s.sql' % name), 'r').read()
-
-
-def _convert_time_spec(spec):
-    if spec is None:
-        return
-
-    if isinstance(spec, basestring):
-        m = _re_timedelta.match(spec)
-        if m is None:
-            raise ValueError(spec)
-
-        g = m.groups()
-        val = int(g[0])
-        key = _timedelta_table.get(g[1])
-        spec = timedelta(**{key: val})
-
-    if isinstance(spec, timedelta):
-        spec = datetime.utcnow() + spec
-
-    return spec
 
 
 class PQ(object):
@@ -183,8 +160,8 @@ class Queue(object):
         hours and days, respectively.
         """
 
-        schedule_at = _convert_time_spec(schedule_at)
-        expected_at = _convert_time_spec(expected_at)
+        schedule_at = convert_time_spec(schedule_at)
+        expected_at = convert_time_spec(expected_at)
 
         with self._transaction() as cursor:
             return self._put_item(
