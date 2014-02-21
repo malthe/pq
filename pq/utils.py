@@ -87,6 +87,10 @@ def convert_time_spec(spec):
     return spec
 
 
+def utc_format(dt):
+    return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
 @contextmanager
 def transaction(conn, **kwargs):
     """Context manager.

@@ -10,7 +10,7 @@ from weakref import WeakValueDictionary
 from json import dumps
 
 from .utils import (
-    Literal, prepared, transaction, convert_time_spec
+    Literal, prepared, transaction, convert_time_spec, utc_format
 )
 
 
@@ -126,12 +126,17 @@ class Queue(object):
         while True:
             try:
                 with self._transaction() as cursor:
-                    data, ts = self._pull_item(cursor, block)
+                    task_id, data, size, te, ts = self._pull_item(
+                        cursor, block
+                    )
             except NotYet as e:
                 data, ts = None, e.args[0]
-
-            if data is not None:
-                return self.loads(data)
+            else:
+                if data is not None:
+                    return Task(
+                        task_id, self.loads(data), size,
+                        te, ts, self.update
+                    )
 
             if not block:
                 return
@@ -168,6 +173,14 @@ class Queue(object):
                 cursor, dumps(self.dumps(data)), schedule_at, expected_at
             )
 
+    def update(self, task_id, data):
+        """Update task data."""
+
+        with self._transaction() as cursor:
+            return self._update_item(
+                cursor, task_id, dumps(self.dumps(data))
+            )
+
     def clear(self):
         with self._transaction() as cursor:
             cursor.execute(
@@ -201,6 +214,17 @@ class Queue(object):
         return cursor.fetchone()[0]
 
     @prepared
+    def _update_item(self, cursor):
+        """Updates a single item into the queue.
+
+            UPDATE %(table)s SET data = $2 WHERE id = $1
+            RETURNING length(data::text)
+
+        """
+
+        return cursor.fetchone()[0]
+
+    @prepared
     def _pull_item(self, cursor, blocking):
         """Return a single item from the queue.
 
@@ -220,7 +244,7 @@ class Queue(object):
             )
             UPDATE %(table)s SET dequeued_at = current_timestamp
             WHERE id = (SELECT id FROM item)
-            RETURNING data, schedule_at
+            RETURNING id, data, length(data::text), enqueued_at, schedule_at
 
         If `blocking` is set, the item blocks until an item is ready
         or the timeout has been reached.
@@ -231,9 +255,9 @@ class Queue(object):
         if row is None:
             if blocking:
                 self._listen(cursor)
-            return None, None
+            return None, None, None, None, None
 
-        schedule_at = row[1]
+        schedule_at = row[4]
         if schedule_at is not None:
             d = schedule_at.replace(tzinfo=None) - datetime.utcnow()
             s = d.total_seconds()
@@ -266,6 +290,43 @@ class Queue(object):
     @contextmanager
     def _transaction(self):
         with self._conn() as conn, \
-            transaction(
-                conn, cursor_factory=self.cursor_factory) as cursor:
+            transaction(conn, cursor_factory=self.cursor_factory) \
+                as cursor:
             yield cursor
+
+
+class Task(object):
+    """An item in the queue."""
+
+    __slots__ = "_data", "_size", "_update", "id", "enqueued_at", "schedule_at"
+
+    def __init__(self, task_id, data, size, enqueued_at, schedule_at, update):
+        self._data = data
+        self._size = size
+        self._update = update
+        self.id = task_id
+        self.enqueued_at = enqueued_at
+        self.schedule_at = schedule_at
+
+    def __repr__(self):
+        cls = type(self)
+        return ('<%s.%s id=%d size=%d enqueued_at=%r schedule_at=%r>' % (
+            cls.__module__,
+            cls.__name__,
+            self.id,
+            self._size,
+            utc_format(self.enqueued_at),
+            utc_format(self.schedule_at) if self.schedule_at else None,
+        )).replace("'", '"')
+
+    def get_data(self):
+        return self._data
+
+    def set_data(self, data):
+        self._size = self._update(self.id, data)
+        self._data = data
+
+    data = property(get_data, set_data)
+
+    del get_data
+    del set_data

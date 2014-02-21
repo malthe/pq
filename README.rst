@@ -74,26 +74,35 @@ a JSON-compatible object, e.g. a Python ``dict``.
 
 ::
 
-    queue.put({'type': 'Cox'})
-    queue.put({'type': 'Arthur Turner'})
-    queue.put({'type': 'Golden Delicious'})
+    queue.put({'kind': 'Cox'})
+    queue.put({'kind': 'Arthur Turner'})
+    queue.put({'kind': 'Golden Delicious'})
 
 Items are pulled out of the queue using ``get(block=True)``. The
 default behavior is to block until an item is available.
 
 ::
 
-    apple = queue.get()
+    def eat(kind):
+        print "umm, %s apples taste good." % kind
 
-Alternatively, there's an iterator interface available.
+    task = queue.get()
+    eat(**task.data)
+
+In addition to ``data``, the ``task`` object provides the
+``enqueued_at`` time as well as the scheduling priority in
+``schedule_at`` (if using).
+
+The queue object is iterable where iteration pulls out items one at a
+time:
 
 ::
 
-    for apple in queue:
-        if apple is None:
+    for task in queue:
+        if task is None:
             break
 
-        apple.eat()
+        eat(**task.data)
 
 The iterator blocks if no item is available. Importantly, there is a
 default timeout of one second, after which the iterator yields a value
@@ -108,7 +117,7 @@ time:
 
 ::
 
-    queue.put({'type': 'Cox'}, "5m")
+    queue.put({'kind': 'Cox'}, "5m")
 
 In this example, the item is ready for work five minutes later. The
 method also accepts ``datetime`` and ``timedelta`` objects.
@@ -122,7 +131,7 @@ be expressed:
 
 ::
 
-    queue.put({'type': 'Cox'}, expected_at="5m")
+    queue.put({'kind': 'Cox'}, expected_at="5m")
 
 This tells the queue processor to give priority to this item over an
 item expected at a later time, and conversely, to prefer an item with
@@ -132,7 +141,7 @@ The scheduling and priority options can be combined:
 
 ::
 
-    queue.put({'type': 'Cox'}, "1h", "2h")
+    queue.put({'kind': 'Cox'}, "1h", "2h")
 
 This item won't be pulled out until after one hour, and even then,
 it's only processed subject to it's priority of two hours.

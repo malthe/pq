@@ -3,6 +3,7 @@
 import os
 import sys
 
+from json import dumps
 from itertools import chain
 from time import time, sleep
 from datetime import datetime
@@ -32,17 +33,19 @@ class LoggingCursor(cursor):
             raise
 
 
-class QueueTest(TestCase):
-    base_concurrency = 4
+class BaseTestCase(TestCase):
+    base_concurrency = 1
 
     @classmethod
     def setUpClass(cls):
         c = cls.base_concurrency * 4
         pool = cls.pool = ThreadedConnectionPool(
-            c, c, "dbname=pq_test user=postgres"
+            c, c, "dbname=pq_test user=postgres",
         )
         from pq import PQ
-        cls.pq = PQ(pool=pool, table="queue")
+        cls.pq = PQ(
+            pool=pool, table="queue",
+        )
 
         try:
             cls.pq.create()
@@ -68,16 +71,20 @@ class QueueTest(TestCase):
         queue.clear()
         return queue
 
+
+class QueueTest(BaseTestCase):
+    base_concurrency = 4
+
     def test_put_and_get(self):
         queue = self.make_one("test")
         queue.put({'foo': 'bar'})
-        self.assertEqual(queue.get(), {'foo': 'bar'})
+        self.assertEqual(queue.get().data, {'foo': 'bar'})
 
     def test_put_and_get_pickle(self):
         queue = self.make_one("test/pickle")
         dt = datetime.utcnow()
         queue.put({'time': dt, 'text': '…æøå!'})
-        self.assertEqual(queue.get(), {'time': dt, 'text': '…æøå!'})
+        self.assertEqual(queue.get().data, {'time': dt, 'text': '…æøå!'})
 
     def test_put_expected_at(self):
         queue = self.make_one("test")
@@ -88,11 +95,11 @@ class QueueTest(TestCase):
         queue.put(5, None, "5s")
         t = time()
         self.assertEqual(len(queue), 5)
-        for i, item in enumerate(queue):
-            if item is None:
+        for i, task in enumerate(queue):
+            if task is None:
                 break
 
-            self.assertEqual(i + 1, item)
+            self.assertEqual(i + 1, task.data)
             d = time() - t
             self.assertTrue(d < 1)
 
@@ -111,22 +118,39 @@ class QueueTest(TestCase):
         def get(block=True): return queue.get(block, 5)
 
         self.assertEqual(get(False), None)
-        self.assertEqual(get(), {'foo': 'bar'})
+        self.assertEqual(get().data, {'foo': 'bar'})
         d = time() - t
         self.assertTrue(2 < d < 3, d)
-        self.assertEqual(get(), {'boo': 'baz'})
+        self.assertEqual(get().data, {'boo': 'baz'})
         d = time() - t
         self.assertTrue(4 < d < 5, d)
-        self.assertEqual(get(), {'baz': 'fob'})
+        self.assertEqual(get().data, {'baz': 'fob'})
         d = time() - t
         self.assertTrue(6 < d < 7, d)
         self.assertEqual(get(False), None)
+
+    def test_get_and_set(self):
+        queue = self.make_one("test")
+        queue.put({'foo': 'bar'})
+        task = queue.get()
+        self.assertEqual(task.data, {'foo': 'bar'})
+        task.data = {'foo': 'boo'}
+
+        with queue._transaction() as cursor:
+            cursor.execute(
+                "SELECT data FROM %s WHERE id = %s",
+                (queue.table, task.id)
+            )
+            data = cursor.fetchone()[0]
+
+        self.assertEqual(task.data, data)
+        self.assertIn('size=%d' % len(dumps(data)), repr(task))
 
     def test_get_not_empty(self):
         queue = self.make_one("test")
         queue.put({'foo': 'bar'})
         t = time()
-        self.assertEqual(queue.get(), {'foo': 'bar'})
+        self.assertEqual(queue.get().data, {'foo': 'bar'})
         self.assertGreater(0.1, time() - t)
 
     def test_get_empty_blocking_timeout(self):
@@ -151,7 +175,7 @@ class QueueTest(TestCase):
         thread = Thread(target=target)
         thread.start()
         t = time()
-        self.assertEqual(queue.get(), {'foo': 'bar'})
+        self.assertEqual(queue.get().data, {'foo': 'bar'})
         self.assertLess(time() - t, 1.0)
         thread.join()
 
@@ -181,7 +205,7 @@ class QueueTest(TestCase):
         t = time()
         self.assertEqual(queue.get(False), None, time() - t)
         sleep(0.2)
-        self.assertEqual(queue.get(False), {'foo': 'bar'})
+        self.assertEqual(queue.get(False).data, {'foo': 'bar'})
         thread.join()
 
     def test_iter(self):
@@ -202,8 +226,8 @@ class QueueTest(TestCase):
         try:
             while True:
                 t = time()
-                i, received = next(iterator)
-                self.assertEqual(data, received, (i, time() - t))
+                i, task = next(iterator)
+                self.assertEqual(data, task.data, (i, time() - t))
                 dt.append(time() - t)
                 if i == 5:
                     break
@@ -361,7 +385,7 @@ class QueueTest(TestCase):
                     if d is None:
                         return
 
-                    consumed.append(tuple(d))
+                    consumed.append(tuple(d.data))
 
         c = self.base_concurrency
         producers = [Thread(target=producer) for i in xrange(c * 2)]
