@@ -89,12 +89,12 @@ default behavior is to block until an item is available.
     task = queue.get()
     eat(**task.data)
 
-In addition to ``data``, the ``task`` object provides the
-``enqueued_at`` time as well as the scheduling priority in
-``schedule_at`` (if using).
+The ``task`` object provides additional metadata in addition to the
+``data`` attribute as illustrated by the string representation:
 
-The queue object is iterable where iteration pulls out items one at a
-time:
+    >>> task
+    <pq.Task id=77709 size=1 enqueued_at="2014-02-21T16:22:06Z" schedule_at=None>
+
 
 ::
 

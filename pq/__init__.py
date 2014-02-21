@@ -314,10 +314,14 @@ class Task(object):
             cls.__module__,
             cls.__name__,
             self.id,
-            self._size,
+            self.size,
             utc_format(self.enqueued_at),
             utc_format(self.schedule_at) if self.schedule_at else None,
         )).replace("'", '"')
+
+    @property
+    def size(self):
+        return self._size
 
     def get_data(self):
         return self._data
