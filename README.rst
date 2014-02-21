@@ -40,23 +40,21 @@ Example usage:
     conn = connect("dbname=example user=postgres")
     pq = PQ(conn)
 
-For multi-threaded operation, use a ``ThreadedConnectionPool`` as the
-connection pool argument.
+For multi-threaded operation, use a connection pool such as
+``psycopg2.pool.ThreadedConnectionPool``.
 
 You probably want to make sure your database is created with the
 ``utf-8`` encoding.
 
-To create the queue tables, you can call the ``create()`` method. It
-creates the database queue table (default name is ``"queue"``) and
-adds an insertion trigger.
+To create and configure the queue table, call the ``create()`` method.
 
 ::
 
-    # Create tables and configure trigger.
     pq.create()
 
-To use a different table name, pass it as the ``table`` argument to
-the ``PQ`` class.
+The table name defaults to ``"queue"``. To use a different name, pass
+it as a string value as the ``table`` argument for the ```PQ`` class
+(illustrated above).
 
 
 Queues
@@ -69,8 +67,8 @@ interface:
 
     queue = pq["apples"]
 
-Use the ``put(data)`` method to insert items into the queue. It takes
-a JSON-compatible object, e.g. a Python ``dict``.
+Use the ``put(data)`` method to insert an item into the queue. It
+takes a JSON-compatible object such as a Python dictionary:
 
 ::
 
@@ -79,7 +77,8 @@ a JSON-compatible object, e.g. a Python ``dict``.
     queue.put({'kind': 'Golden Delicious'})
 
 Items are pulled out of the queue using ``get(block=True)``. The
-default behavior is to block until an item is available.
+default behavior is to block until an item is available with a default
+timeout of one second after which a value of ``None`` is returned.
 
 ::
 
@@ -95,6 +94,7 @@ The ``task`` object provides additional metadata in addition to the
     >>> task
     <pq.Task id=77709 size=1 enqueued_at="2014-02-21T16:22:06Z" schedule_at=None>
 
+The ``get`` operation is also available through iteration:
 
 ::
 
@@ -104,9 +104,20 @@ The ``task`` object provides additional metadata in addition to the
 
         eat(**task.data)
 
-The iterator blocks if no item is available. Importantly, there is a
-default timeout of one second, after which the iterator yields a value
-of ``None``.
+The iterator blocks if no item is available. Again, there is a default
+timeout of one second, after which the iterator yields a value of
+``None``.
+
+An application can then choose to break out of the loop, or wait again
+for an item to be ready.
+
+::
+
+    for task in queue:
+        if task is not None:
+            eat(**task.data)
+
+        # This is an infinite loop!
 
 
 Scheduling
