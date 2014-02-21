@@ -67,6 +67,24 @@ interface:
 
     queue = pq["apples"]
 
+The ``queue`` object provides ``get`` and ``put`` methods as explained
+below, and in addition, it also works as a context manager where it
+manages a transaction:
+
+::
+
+    with queue as cursor:
+        ...
+
+The statements inside the context manager are either committed as a
+transaction or rejected, atomically. This is useful when a queue is
+used to manage tasks because it allows you to retrieve a task from the
+queue, perform a task and write a result, with transactional
+semantics.
+
+Methods
+=======
+
 Use the ``put(data)`` method to insert an item into the queue. It
 takes a JSON-compatible object such as a Python dictionary:
 

@@ -89,6 +89,8 @@ class Queue(object):
 
     dumps = loads = staticmethod(lambda data: data)
 
+    ctx = cursor = None
+
     def __init__(self, name, conn=None, pool=None, table='queue', **kwargs):
         self.conn = conn
         self.pool = pool
@@ -102,6 +104,18 @@ class Queue(object):
 
         # Set additional options.
         self.__dict__.update(kwargs)
+
+    def __enter__(self):
+        self.ctx = self._transaction()
+        self.cursor = self.ctx.__enter__()
+        return self.cursor
+
+    def __exit__(self, *args):
+        try:
+            self.ctx.__exit__(*args)
+        finally:
+            del self.cursor
+            del self.ctx
 
     def __iter__(self):
         return QueueIterator(self)
@@ -289,6 +303,16 @@ class Queue(object):
 
     @contextmanager
     def _transaction(self):
+        if self.cursor is not None:
+            self.cursor.execute("SAVEPOINT pq")
+            try:
+                yield self.cursor
+            except:
+                self.cursor.execute("ROLLBACK TO SAVEPOINT pq")
+                raise
+            self.cursor.execute("RELEASE SAVEPOINT pq")
+            return
+
         with self._conn() as conn, \
             transaction(conn, cursor_factory=self.cursor_factory) \
                 as cursor:

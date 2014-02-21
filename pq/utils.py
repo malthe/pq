@@ -108,7 +108,7 @@ def transaction(conn, **kwargs):
     try:
         yield cursor
         conn.commit()
-    except Exception:
+    except:
         conn.rollback()
         raise
     finally:

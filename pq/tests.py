@@ -404,3 +404,42 @@ class QueueTest(BaseTestCase):
             t.join()
 
         self.assertEqual(len(consumed), len(set(consumed)))
+
+    def test_context_manager_put(self):
+        queue = self.make_one("test")
+
+        with queue:
+            queue.put({'foo': 'bar'})
+
+        task = queue.get()
+        self.assertEqual(task.data, {'foo': 'bar'})
+
+    def test_context_manager_get_and_set(self):
+        queue = self.make_one("test")
+        queue.put({'foo': 'bar'})
+
+        with queue:
+            task = queue.get()
+            self.assertEqual(task.data, {'foo': 'bar'})
+            task.data = {'foo': 'boo'}
+
+        with queue as cursor:
+            cursor.execute(
+                "SELECT data FROM %s WHERE id = %s",
+                (queue.table, task.id)
+            )
+            data = cursor.fetchone()[0]
+
+        self.assertEqual(task.data, data)
+        self.assertIn('size=%d' % len(dumps(data)), repr(task))
+
+    def test_context_manager_exception(self):
+        queue = self.make_one("test")
+
+        def test():
+            with queue:
+                queue.put({'foo': 'bar'})
+                raise ValueError()
+
+        self.assertRaises(ValueError, test)
+        self.assertEqual(queue.get(), None)
