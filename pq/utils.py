@@ -1,6 +1,7 @@
 import re
 
 from contextlib import contextmanager
+from weakref import WeakKeyDictionary
 from functools import wraps
 from textwrap import dedent
 from logging import getLogger
@@ -13,6 +14,7 @@ logger = getLogger("pq")
 _re_format = re.compile(r'%\(([a-z]+)\)[a-z]')
 _re_timedelta = re.compile(r'(\d+)([smhd])')
 _timedelta_table = dict(s='seconds', m='minutes', h='hours', d='days')
+_statements = WeakKeyDictionary()
 
 
 def prepared(f):
@@ -52,8 +54,13 @@ def prepared(f):
         name = fname % self.__dict__
         key = "_prepared_%s" % name
 
-        if not hasattr(conn, key):
-            setattr(conn, key, None)
+        try:
+            prepared = _statements[conn]
+        except KeyError:
+            prepared = _statements[conn] = set()
+
+        if key not in prepared:
+            prepared.add(key)
             d = self.__dict__.copy()
             cursor.execute("PREPARE %s AS\n%s" % (name, query), d)
 
@@ -118,11 +125,19 @@ def transaction(conn, **kwargs):
         logger.warn(notice)
 
 
-class Literal(str):
+class Literal(object):
     """String wrapper to make a query parameter literal."""
+
+    __slots__ = "s",
+
+    def __init__(self, s):
+        self.s = str(s)
 
     def __conform__(self, quote):
         return self
+
+    def __str__(self):
+        return self.s
 
     @classmethod
     def mro(cls):

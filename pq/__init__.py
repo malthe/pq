@@ -78,8 +78,8 @@ class Queue(object):
     # returns ``None``.
     timeout = 1
 
-    # This setting uses the default cursor factory.
-    cursor_factory = None
+    # Keyword arguments passed when creating a new cursor.
+    cursor_kwargs = {}
 
     logger = getLogger('pq')
 
@@ -313,8 +313,7 @@ class Queue(object):
             self.cursor.execute("RELEASE SAVEPOINT pq")
             return
 
-        with self._conn() as conn, \
-            transaction(conn, cursor_factory=self.cursor_factory) \
+        with self._conn() as conn, transaction(conn, **self.cursor_kwargs) \
                 as cursor:
             yield cursor
 
