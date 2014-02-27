@@ -17,6 +17,8 @@ Improvements:
 
 Bugs:
 
+- The `Literal` string wrapper did not work correctly with `psycopg2`.
+
 - The transaction manager now correctly returns connections to the
   pool.
 
