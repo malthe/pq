@@ -252,12 +252,15 @@ class Queue(object):
                FROM %(table)s
                WHERE q_name = %(name)s
                  AND dequeued_at IS NULL
-                 AND pg_try_advisory_xact_lock(id)
                ORDER BY schedule_at nulls first, expected_at nulls first
-               FOR UPDATE LIMIT 1
+               LIMIT (SELECT sum(numbackends) FROM pg_stat_database)
             )
             UPDATE %(table)s SET dequeued_at = current_timestamp
-            WHERE id = (SELECT id FROM item)
+            WHERE id = (
+               SELECT id FROM item
+               WHERE pg_try_advisory_xact_lock(id)
+               LIMIT 1
+            )
             RETURNING id, data, length(data::text), enqueued_at, schedule_at
 
         If `blocking` is set, the item blocks until an item is ready
