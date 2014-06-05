@@ -247,20 +247,23 @@ class Queue(object):
 
         This method uses the following query:
 
-            WITH item AS (
-               SELECT id, data, schedule_at at time zone 'utc'
+            WITH candidates AS (
+               SELECT id, data,
+                      schedule_at as schedule_at,
+                      expected_at as expected_at
                FROM %(table)s
-               WHERE q_name = %(name)s
-                 AND dequeued_at IS NULL
+               WHERE q_name = %(name)s AND dequeued_at IS NULL
                ORDER BY schedule_at nulls first, expected_at nulls first
                LIMIT (SELECT sum(numbackends) FROM pg_stat_database)
-            )
-            UPDATE %(table)s SET dequeued_at = current_timestamp
-            WHERE id = (
-               SELECT id FROM item
+             ),  selected AS (
+               SELECT id, schedule_at, expected_at FROM candidates
                WHERE pg_try_advisory_xact_lock(id)
+               ORDER BY schedule_at nulls first, expected_at nulls first
                LIMIT 1
             )
+            UPDATE %(table)s SET dequeued_at = current_timestamp
+            WHERE id = (SELECT id FROM selected)
+            AND dequeued_at IS NULL
             RETURNING id, data, length(data::text), enqueued_at, schedule_at
 
         If `blocking` is set, the item blocks until an item is ready
