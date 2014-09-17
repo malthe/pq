@@ -1,7 +1,16 @@
 Changes
 =======
 
-- In next release ...
+1.2
+----------------
+
+Improvements:
+
+- Improved the issue where parallel consumer and producer tasks could result in
+  an exponentially growing locks count.
+
+- Improved the issue where scheduled tasks would consume all available 
+  database connections.
 
 
 1.1 (2014-02-27)
