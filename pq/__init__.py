@@ -256,7 +256,7 @@ class Queue(object):
                ORDER BY schedule_at nulls first, expected_at nulls first
                LIMIT (SELECT sum(numbackends) FROM pg_stat_database)
              ),  selected AS (
-               SELECT id, schedule_at, expected_at FROM candidates
+               SELECT id FROM candidates
                WHERE pg_try_advisory_xact_lock(id)
                ORDER BY schedule_at nulls first, expected_at nulls first
                LIMIT 1
