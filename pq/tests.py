@@ -106,28 +106,37 @@ class QueueTest(BaseTestCase):
         # We expect five plus the empty.
         self.assertEqual(i, 5)
 
+    def test_put_schedule_at_without_blocking(self):
+        queue = self.make_one("test_schedule_at_non_blocking")
+        queue.put({'baz': 'fob'}, "6s")
+
+        def get(block=True): return queue.get(block, 5)
+
+        self.assertEqual(queue.get(False, 5), None)
+
     def test_put_schedule_at(self):
-        queue = self.make_one("test")
-        t = time()
+        queue = self.make_one("test_schedule_at_blocking")
+        queue.put({'bar': 'foo'})
         queue.put({'baz': 'fob'}, "6s")
         queue.put({'foo': 'bar'}, "2s")
         queue.put({'boo': 'baz'}, "4s")
-        sleep(0.2)
 
         # We use a timeout of five seconds for this test.
         def get(block=True): return queue.get(block, 5)
 
-        self.assertEqual(get(False), None)
+        t = time()
+        self.assertEqual(get().data, {'bar': 'foo'})
+        d = time() - t
+        self.assertTrue(0 < d < 1, d)
         self.assertEqual(get().data, {'foo': 'bar'})
         d = time() - t
-        self.assertTrue(2 < d < 3, d)
+        self.assertTrue(1.9 < d < 3, d)
         self.assertEqual(get().data, {'boo': 'baz'})
         d = time() - t
         self.assertTrue(4 < d < 5, d)
         self.assertEqual(get().data, {'baz': 'fob'})
         d = time() - t
-        self.assertTrue(6 < d < 7, d)
-        self.assertEqual(get(False), None)
+        self.assertTrue(5.9 < d < 7, d)
 
     def test_get_and_set(self):
         queue = self.make_one("test")
@@ -154,7 +163,7 @@ class QueueTest(BaseTestCase):
         self.assertGreater(0.1, time() - t)
 
     def test_get_empty_blocking_timeout(self):
-        queue = self.make_one("test")
+        queue = self.make_one("test_blocking_timeout")
         t = time()
         self.assertEqual(queue.get(timeout=2), None)
         self.assertGreater(time() - t, 2)
