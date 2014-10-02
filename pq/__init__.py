@@ -139,9 +139,13 @@ class Queue(object):
                 task_id, data, size, te, ts, seconds = self._pull_item(
                     cursor, block
                 )
-                self.last_timeout = seconds or self.last_timeout
+                self.last_timeout = seconds or self.last_timeout or self.timeout
 
             if data is not None:
+                # Reset the timeout if there's no esitmation
+                if seconds is None:
+                    self.last_timeout = self.timeout
+
                 return Task(
                     task_id, self.loads(data), size,
                     te, ts, self.update
@@ -150,7 +154,6 @@ class Queue(object):
             if not block:
                 return
 
-            self.last_timeout = self.last_timeout or self.timeout
             self.last_timeout = min(self.last_timeout, self.timeout)
 
             if not self._select(self.last_timeout):

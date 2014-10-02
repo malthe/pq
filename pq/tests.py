@@ -138,6 +138,11 @@ class QueueTest(BaseTestCase):
         d = time() - t
         self.assertTrue(5.9 < d < 7, d)
 
+        # This ensures the timeout has been reset
+        self.assertEqual(get(), None)
+        d = time() - t
+        self.assertTrue(11 < d < 12, d)
+
     def test_get_and_set(self):
         queue = self.make_one("test")
         queue.put({'foo': 'bar'})
