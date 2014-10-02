@@ -298,8 +298,7 @@ class Queue(object):
 
     def _select(self, timeout):
         with self._conn() as conn:
-            fd = conn.fileno()
-            r, w, x = select([fd], [], [], timeout)
+            r, w, x = select([conn], [], [], timeout)
         has_data = bool(r or w or x)
         if not has_data:
             self.logger.debug("timeout (%.3f seconds)." % timeout)
