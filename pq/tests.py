@@ -76,6 +76,13 @@ class BaseTestCase(TestCase):
 class QueueTest(BaseTestCase):
     base_concurrency = 4
 
+    @contextmanager
+    def assertExecutionTime(self, condition):
+        start = time()
+        yield
+        seconds = time() - start
+        self.assertTrue(condition(seconds), seconds)
+
     def test_put_and_get(self):
         queue = self.make_one("test")
         queue.put({'foo': 'bar'})
@@ -116,7 +123,6 @@ class QueueTest(BaseTestCase):
         self.assertEqual(queue.get(False, 5), None)
 
     def test_put_schedule_at(self):
-        timer = dict(seconds=0)
         queue = self.make_one("test_schedule_at_blocking")
         queue.put({'bar': 'foo'})
         queue.put({'baz': 'fob'}, "6s")
@@ -126,32 +132,21 @@ class QueueTest(BaseTestCase):
         # We use a timeout of five seconds for this test.
         def get(block=True): return queue.get(block, 5)
 
-        @contextmanager
-        def profile_execution_time(execution_time):
-            start = time()
-            yield
-            execution_time['seconds'] = time() - start
-
-        with profile_execution_time(timer):
+        with self.assertExecutionTime(lambda seconds: 0 < seconds < 1):
             self.assertEqual(get().data, {'bar': 'foo'})
-        self.assertTrue(0 < timer['seconds'] < 1, timer['seconds'])
 
-        with profile_execution_time(timer):
+        with self.assertExecutionTime(lambda seconds: 0 < seconds < 3):
             self.assertEqual(get().data, {'foo': 'bar'})
-        self.assertTrue(0 < timer['seconds'] < 3, timer['seconds'])
 
-        with profile_execution_time(timer):
+        with self.assertExecutionTime(lambda seconds: 0 < seconds < 3):
             self.assertEqual(get().data, {'boo': 'baz'})
-        self.assertTrue(0 < timer['seconds'] < 3, timer['seconds'])
 
-        with profile_execution_time(timer):
+        with self.assertExecutionTime(lambda seconds: 0 < seconds < 3):
             self.assertEqual(get().data, {'baz': 'fob'})
-        self.assertTrue(0 < timer['seconds'] < 3, timer['seconds'])
 
         # This ensures the timeout has been reset
-        with profile_execution_time(timer):
+        with self.assertExecutionTime(lambda seconds: 0 < seconds < 6):
             self.assertEqual(get(), None)
-        self.assertTrue(0 < timer['seconds'] < 6, timer['seconds'])
 
     def test_get_and_set(self):
         queue = self.make_one("test")
@@ -173,21 +168,21 @@ class QueueTest(BaseTestCase):
     def test_get_not_empty(self):
         queue = self.make_one("test")
         queue.put({'foo': 'bar'})
-        t = time()
-        self.assertEqual(queue.get().data, {'foo': 'bar'})
-        self.assertGreater(0.1, time() - t)
+
+        with self.assertExecutionTime(lambda seconds: 0 < seconds < 0.1):
+            self.assertEqual(queue.get().data, {'foo': 'bar'})
 
     def test_get_empty_blocking_timeout(self):
         queue = self.make_one("test_blocking_timeout")
-        t = time()
-        self.assertEqual(queue.get(timeout=2), None)
-        self.assertGreater(time() - t, 2)
+
+        with self.assertExecutionTime(lambda seconds: seconds > 2):
+            self.assertEqual(queue.get(timeout=2), None)
 
     def test_get_empty_non_blocking_timeout(self):
         queue = self.make_one("test")
-        t = time()
-        self.assertEqual(queue.get(), None)
-        self.assertGreater(time() - t, 0.1)
+
+        with self.assertExecutionTime(lambda seconds: seconds > 0.1):
+            self.assertEqual(queue.get(), None)
 
     def test_get_empty_thread_puts(self):
         queue = self.make_one("test")
@@ -198,9 +193,10 @@ class QueueTest(BaseTestCase):
 
         thread = Thread(target=target)
         thread.start()
-        t = time()
-        self.assertEqual(queue.get().data, {'foo': 'bar'})
-        self.assertLess(time() - t, 1.0)
+
+        with self.assertExecutionTime(lambda seconds: seconds < 1):
+            self.assertEqual(queue.get().data, {'foo': 'bar'})
+
         thread.join()
 
     def test_get_empty_thread_puts_after_timeout(self):
@@ -212,9 +208,10 @@ class QueueTest(BaseTestCase):
 
         thread = Thread(target=target)
         thread.start()
-        t = time()
-        self.assertEqual(queue.get(), None)
-        self.assertGreater(time() - t, 1.0)
+
+        with self.assertExecutionTime(lambda seconds: seconds > 0.1):
+            self.assertEqual(queue.get(), None)
+
         thread.join()
 
     def test_get_empty_non_blocking_thread_puts(self):
