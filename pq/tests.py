@@ -2,14 +2,15 @@
 
 import os
 import sys
-
 from json import dumps
 from itertools import chain
 from time import time, sleep
 from datetime import datetime
+from contextlib import contextmanager
 from unittest import TestCase, SkipTest
 from logging import getLogger, StreamHandler, INFO
 from threading import Event, Thread, current_thread
+
 from psycopg2cffi.pool import ThreadedConnectionPool
 from psycopg2cffi import ProgrammingError
 from psycopg2cffi.extensions import cursor
@@ -115,6 +116,7 @@ class QueueTest(BaseTestCase):
         self.assertEqual(queue.get(False, 5), None)
 
     def test_put_schedule_at(self):
+        timer = dict(seconds=0)
         queue = self.make_one("test_schedule_at_blocking")
         queue.put({'bar': 'foo'})
         queue.put({'baz': 'fob'}, "6s")
@@ -124,24 +126,32 @@ class QueueTest(BaseTestCase):
         # We use a timeout of five seconds for this test.
         def get(block=True): return queue.get(block, 5)
 
-        t = time()
-        self.assertEqual(get().data, {'bar': 'foo'})
-        d = time() - t
-        self.assertTrue(0 < d < 1, d)
-        self.assertEqual(get().data, {'foo': 'bar'})
-        d = time() - t
-        self.assertTrue(1.9 < d < 3, d)
-        self.assertEqual(get().data, {'boo': 'baz'})
-        d = time() - t
-        self.assertTrue(4 < d < 5, d)
-        self.assertEqual(get().data, {'baz': 'fob'})
-        d = time() - t
-        self.assertTrue(5.9 < d < 7, d)
+        @contextmanager
+        def profile_execution_time(execution_time):
+            start = time()
+            yield
+            execution_time['seconds'] = time() - start
+
+        with profile_execution_time(timer):
+            self.assertEqual(get().data, {'bar': 'foo'})
+        self.assertTrue(0 < timer['seconds'] < 1, timer['seconds'])
+
+        with profile_execution_time(timer):
+            self.assertEqual(get().data, {'foo': 'bar'})
+        self.assertTrue(0 < timer['seconds'] < 3, timer['seconds'])
+
+        with profile_execution_time(timer):
+            self.assertEqual(get().data, {'boo': 'baz'})
+        self.assertTrue(0 < timer['seconds'] < 3, timer['seconds'])
+
+        with profile_execution_time(timer):
+            self.assertEqual(get().data, {'baz': 'fob'})
+        self.assertTrue(0 < timer['seconds'] < 3, timer['seconds'])
 
         # This ensures the timeout has been reset
-        self.assertEqual(get(), None)
-        d = time() - t
-        self.assertTrue(11 < d < 12, d)
+        with profile_execution_time(timer):
+            self.assertEqual(get(), None)
+        self.assertTrue(0 < timer['seconds'] < 6, timer['seconds'])
 
     def test_get_and_set(self):
         queue = self.make_one("test")
