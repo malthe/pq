@@ -2,9 +2,11 @@
 
 import os
 import sys
+
 from json import dumps
 from itertools import chain
 from time import time, sleep
+from math import sqrt
 from datetime import datetime
 from contextlib import contextmanager
 from unittest import TestCase, SkipTest
@@ -19,6 +21,17 @@ from psycopg2cffi.extensions import cursor
 # particular queue instance (via the `logging` flag).
 getLogger('pq').setLevel(INFO)
 getLogger('pq').addHandler(StreamHandler())
+
+
+def mean(values):
+    return sum(values) / float(len(values))
+
+
+def stdev(values, c):
+    n = len(values)
+    ss = sum((x - c) ** 2 for x in values)
+    ss -= sum((x - c) for x in values) ** 2 / n
+    return sqrt(ss / (n - 1))
 
 
 class LoggingCursor(cursor):
@@ -327,25 +340,44 @@ class QueueTest(BaseTestCase):
         get_throughput = iterations * self.base_concurrency / elapsed
         event.clear()
 
+        p_times = {}
+
         # Queue.__iter__
         def producer():
-            active[0].append(current_thread())
+            thread = current_thread()
+            times = p_times[thread] = []
+            active[0].append(thread)
             event.wait()
             i = 0
             while True:
+                t = time()
                 queue.put({})
+                times.append(time() - t)
                 i += 1
                 if i > items / self.base_concurrency:
                     break
 
+        c_times = {}
+
         def consumer(consumed):
-            active[1].append(current_thread())
+            thread = current_thread()
+            times = c_times[thread] = []
+            active[1].append(thread)
             event.wait()
             iterator = iter(queue)
             iterator.timeout = 0.1
-            for item in iterator:
+
+            while True:
+                t = time()
+                try:
+                    item = next(iterator)
+                except StopIteration:
+                    break
+
                 if item is None:
                     break
+
+                times.append(time() - t)
                 consumed.append(item)
 
         # Use a trial run to warm up JIT (when using PyPy).
@@ -379,15 +411,28 @@ class QueueTest(BaseTestCase):
         elapsed = time() - t
         consumed = sum(map(len, cs))
 
+        c_times = [1000000 * v for v in chain(*c_times.values())]
+        p_times = [1000000 * v for v in chain(*p_times.values())]
+
+        get_latency = mean(c_times)
+        put_latency = mean(p_times)
+
+        get_stdev = stdev(c_times, get_latency)
+        put_stdev = stdev(p_times, put_latency)
+
         sys.stderr.write("complete.\n>>> stats: %s ... " % (
             "\n           ".join(
             "%s: %s" % item for item in (
-                ("threads   ", c),
-                ("consumed  ", consumed),
-                ("remaining ", len(queue)),
-                ("throughput", "%d items/s" % (consumed / elapsed)),
-                ("get       ", "%d items/s" % (get_throughput)),
-                ("put       ", "%d items/s" % (put_throughput)),
+                ("threads       ", c),
+                ("consumed      ", consumed),
+                ("remaining     ", len(queue)),
+                ("throughput    ", "%d items/s" % (consumed / elapsed)),
+                ("get           ", "%d items/s" % (get_throughput)),
+                ("put           ", "%d items/s" % (put_throughput)),
+                ("get (mean avg)", "%d μs/item" % (get_latency)),
+                ("put (mean avg)", "%d μs/item" % (put_latency)),
+                ("get (stdev)   ", "%d μs/item" % (get_stdev)),
+                ("put (stdev)   ", "%d μs/item" % (put_stdev)),
             ))))
 
     def test_producer_consumer_threaded(self):
