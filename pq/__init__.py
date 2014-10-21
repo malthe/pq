@@ -46,10 +46,6 @@ class PQ(object):
             cursor.execute(sql, {'name': Literal(queue.table)})
 
 
-class NotYet(Exception):
-    """Raised when an item is not ready for work."""
-
-
 class QueueIterator(object):
     """Returns a queue iterator.
 
@@ -77,6 +73,7 @@ class Queue(object):
     # and no item was pulled from the queue, the iteration loop
     # returns ``None``.
     timeout = 1
+    last_timeout = None
 
     # Keyword arguments passed when creating a new cursor.
     cursor_kwargs = {}
@@ -135,32 +132,31 @@ class Queue(object):
     def get(self, block=True, timeout=None):
         """Pull item from queue."""
 
-        timeout = timeout or self.timeout
+        self.timeout = timeout or self.timeout
 
         while True:
-            try:
-                with self._transaction() as cursor:
-                    task_id, data, size, te, ts = self._pull_item(
-                        cursor, block
-                    )
-            except NotYet as e:
-                data, ts = None, e.args[0]
-            else:
-                if data is not None:
-                    return Task(
-                        task_id, self.loads(data), size,
-                        te, ts, self.update
-                    )
+            with self._transaction() as cursor:
+                task_id, data, size, te, ts, seconds = self._pull_item(
+                    cursor, block
+                )
+                self.last_timeout = seconds or self.last_timeout or self.timeout
+
+            if data is not None:
+                # Reset the timeout if there's no esitmation
+                if seconds is None:
+                    self.last_timeout = self.timeout
+
+                return Task(
+                    task_id, self.loads(data), size,
+                    te, ts, self.update
+                )
 
             if not block:
                 return
 
-            if ts is None:
-                ts = timeout
-            else:
-                ts = min(ts, timeout)
+            self.last_timeout = min(self.last_timeout, self.timeout)
 
-            if not self._select(ts):
+            if not self._select(self.last_timeout):
                 block = False
 
     def put(self, data, schedule_at=None, expected_at=None):
@@ -247,18 +243,35 @@ class Queue(object):
 
         This method uses the following query:
 
-            WITH item AS (
-               SELECT id, data, schedule_at at time zone 'utc'
+            WITH candidates AS (
+               SELECT id, data,
+                  schedule_at as schedule_at,
+                  expected_at as expected_at
                FROM %(table)s
-               WHERE q_name = %(name)s
-                 AND dequeued_at IS NULL
-                 AND pg_try_advisory_xact_lock(id)
+               WHERE q_name = %(name)s AND dequeued_at IS NULL
                ORDER BY schedule_at nulls first, expected_at nulls first
-               FOR UPDATE LIMIT 1
+               LIMIT 2
+             ),  selected AS (
+               SELECT id FROM candidates
+               WHERE (
+                     schedule_at <= (now() AT TIME ZONE 'utc')
+                     OR schedule_at is NULL
+                  )
+                  AND pg_try_advisory_xact_lock(id)
+               ORDER BY schedule_at nulls first, expected_at nulls first
+               LIMIT 1
+            ), next_timeout AS (
+               SELECT MIN(EXTRACT(SECOND FROM (
+                   schedule_at - (now() AT TIME ZONE 'utc')))) AS seconds
+               FROM candidates
+               WHERE schedule_at >= now() AT TIME ZONE 'utc'
             )
             UPDATE %(table)s SET dequeued_at = current_timestamp
-            WHERE id = (SELECT id FROM item)
-            RETURNING id, data, length(data::text), enqueued_at, schedule_at
+            WHERE id = (SELECT id FROM selected)
+            AND dequeued_at IS NULL
+            RETURNING
+               id, data, length(data::text), enqueued_at, schedule_at,
+               (SELECT seconds FROM next_timeout)
 
         If `blocking` is set, the item blocks until an item is ready
         or the timeout has been reached.
@@ -266,18 +279,12 @@ class Queue(object):
         """
 
         row = cursor.fetchone()
+
         if row is None:
             if blocking:
                 self._listen(cursor)
-            return None, None, None, None, None
 
-        schedule_at = row[4]
-        if schedule_at is not None:
-            d = schedule_at.replace(tzinfo=None) - datetime.utcnow()
-            s = d.total_seconds()
-            if s >= 0:
-                self.logger.debug("Next item ready in %d seconds.", s)
-                raise NotYet(s)
+            return None, None, None, None, None, None
 
         return row
 
@@ -294,8 +301,7 @@ class Queue(object):
 
     def _select(self, timeout):
         with self._conn() as conn:
-            fd = conn.fileno()
-            r, w, x = select([fd], [], [], timeout)
+            r, w, x = select([conn], [], [], timeout)
         has_data = bool(r or w or x)
         if not has_data:
             self.logger.debug("timeout (%.3f seconds)." % timeout)
