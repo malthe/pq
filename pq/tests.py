@@ -74,6 +74,7 @@ class BaseTestCase(TestCase):
 
     def setUp(self):
         self.queues = []
+        self.start = time()
 
     def tearDown(self):
         for queue in self.queues:
@@ -90,10 +91,9 @@ class QueueTest(BaseTestCase):
     base_concurrency = 4
 
     @contextmanager
-    def assertExecutionTime(self, condition):
-        start = time()
+    def assertExecutionTime(self, condition, start=None):
         yield
-        seconds = time() - start
+        seconds = time() - (start or self.start)
         self.assertTrue(condition(seconds), seconds)
 
     def test_put_and_get(self):
@@ -145,20 +145,23 @@ class QueueTest(BaseTestCase):
         # We use a timeout of five seconds for this test.
         def get(block=True): return queue.get(block, 5)
 
-        with self.assertExecutionTime(lambda seconds: 0 < seconds < 1):
-            self.assertEqual(get().data, {'bar': 'foo'})
+        # First item is immediately available.
+        self.assertEqual(get(False).data, {'bar': 'foo'})
 
-        with self.assertExecutionTime(lambda seconds: 0 < seconds < 3):
+        with self.assertExecutionTime(lambda seconds: 2 < seconds < 3):
             self.assertEqual(get().data, {'foo': 'bar'})
 
-        with self.assertExecutionTime(lambda seconds: 0 < seconds < 3):
+        with self.assertExecutionTime(lambda seconds: 4 < seconds < 5):
             self.assertEqual(get().data, {'boo': 'baz'})
 
-        with self.assertExecutionTime(lambda seconds: 0 < seconds < 3):
+        with self.assertExecutionTime(lambda seconds: 6 < seconds < 7):
             self.assertEqual(get().data, {'baz': 'fob'})
 
         # This ensures the timeout has been reset
-        with self.assertExecutionTime(lambda seconds: 0 < seconds < 6):
+        with self.assertExecutionTime(
+                lambda seconds: queue.timeout < seconds < queue.timeout + 1,
+                time(),
+        ):
             self.assertEqual(get(), None)
 
     def test_get_and_set(self):
