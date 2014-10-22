@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='pq',
-    version='1.2',
+    version='1.3-dev',
     url='https://github.com/malthe/pq/',
     license='BSD',
     author='Malthe Borch',
