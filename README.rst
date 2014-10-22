@@ -8,7 +8,7 @@ The system uses a single table that holds all tasks across queues; the
 specifics are easy to customize.
 
 The system currently supports only the `psycopg2
-https://pypi.python.org/pypi/psycopg2`_ database driver – or
+<https://pypi.python.org/pypi/psycopg2>`_ database driver – or
 `psycopg2cffi <https://pypi.python.org/pypi/psycopg2cffi>`_ for PyPy.
 
 The basic queue implementation is similar to Ryan Smith's
