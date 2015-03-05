@@ -3,7 +3,7 @@ Changes
 
 In next release ...
 
-- ...
+- Fix time zone issue.
 
 
 1.2 (2014-10-21)

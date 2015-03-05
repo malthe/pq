@@ -5,9 +5,7 @@ from weakref import WeakKeyDictionary
 from functools import wraps
 from textwrap import dedent
 from logging import getLogger
-from datetime import (
-    datetime, timedelta
-)
+from datetime import datetime, timedelta
 
 logger = getLogger("pq")
 
@@ -95,7 +93,10 @@ def convert_time_spec(spec):
 
 
 def utc_format(dt):
-    return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+    dt = dt.replace(tzinfo=None) - (
+        dt.tzinfo.utcoffset(dt) if dt.tzinfo else timedelta()
+    )
+    return dt.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 
 @contextmanager

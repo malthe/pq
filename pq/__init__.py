@@ -180,7 +180,9 @@ class Queue(object):
 
         with self._transaction() as cursor:
             return self._put_item(
-                cursor, dumps(self.dumps(data)), schedule_at, expected_at
+                cursor, dumps(self.dumps(data)),
+                utc_format(schedule_at) if schedule_at is not None else None,
+                utc_format(expected_at) if expected_at is not None else None,
             )
 
     def update(self, task_id, data):
@@ -254,23 +256,24 @@ class Queue(object):
              ),  selected AS (
                SELECT id FROM candidates
                WHERE (
-                     schedule_at <= (now() AT TIME ZONE 'utc')
-                     OR schedule_at is NULL
+                     schedule_at <= now() OR schedule_at is NULL
                   )
                   AND pg_try_advisory_xact_lock(id)
                ORDER BY schedule_at nulls first, expected_at nulls first
                LIMIT 1
             ), next_timeout AS (
                SELECT MIN(EXTRACT(SECOND FROM (
-                   schedule_at - (now() AT TIME ZONE 'utc')))) AS seconds
+                   schedule_at - now()))) AS seconds
                FROM candidates
-               WHERE schedule_at >= now() AT TIME ZONE 'utc'
+               WHERE schedule_at >= now()
             )
             UPDATE %(table)s SET dequeued_at = current_timestamp
             WHERE id = (SELECT id FROM selected)
             AND dequeued_at IS NULL
             RETURNING
-               id, data, length(data::text), enqueued_at, schedule_at,
+               id, data, length(data::text),
+               enqueued_at AT TIME ZONE 'utc',
+               schedule_at AT TIME ZONE 'utc',
                (SELECT seconds FROM next_timeout)
 
         If `blocking` is set, the item blocks until an item is ready
