@@ -9,5 +9,6 @@ addons:
 install:
   - pip install -U .
 before_script:
+  - pip install psycopg2cffi
   - psql -U postgres -c "CREATE DATABASE pq_test"
 script:  python setup.py test
