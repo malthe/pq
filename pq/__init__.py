@@ -67,8 +67,15 @@ class QueueIterator(object):
     def __iter__(self):
         return self
 
-    def next(self):
+    def __next__(self):
+        ''' Python 3 iterator.
+        '''
         return self.queue.get(timeout=self.timeout)
+
+    def next(self):
+        ''' Python 2 iterator.
+        '''
+        return QueueIterator.__next__(self)
 
 
 class Queue(object):
