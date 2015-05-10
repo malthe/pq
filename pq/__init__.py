@@ -93,7 +93,15 @@ class Queue(object):
     logger = getLogger('pq')
 
     converters = {
-        'pickle': (pickle.dumps, lambda data: pickle.loads(str(data))),
+        'pickle': (
+            #
+            # Pickle protocol 0 claims to be ASCII, but it outputs
+            # characters outside of range(128). So, we treat it
+            # like Latin-1 so that it can encoded into JSON UTF-8.
+            #
+            lambda data: pickle.dumps(data, 0).decode('latin-1'),
+            lambda data: pickle.loads(data.encode('latin-1'))
+            ),
     }
 
     dumps = loads = staticmethod(lambda data: data)
