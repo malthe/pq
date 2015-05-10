@@ -1,5 +1,10 @@
 import os
-import cPickle as pickle
+import sys
+
+if sys.version_info[0] == 2:
+    import cPickle as pickle
+else:
+    import pickle as pickle
 
 from contextlib import contextmanager
 from datetime import datetime
