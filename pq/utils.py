@@ -76,7 +76,7 @@ def convert_time_spec(spec):
     if spec is None:
         return
 
-    if isinstance(spec, basestring):
+    if isinstance(spec, str) or isinstance(spec, unicode):
         m = _re_timedelta.match(spec)
         if m is None:
             raise ValueError(spec)

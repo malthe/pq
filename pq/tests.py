@@ -251,7 +251,7 @@ class QueueTest(BaseTestCase):
         queue.put(data)
 
         def target():
-            for i in xrange(5):
+            for i in range(5):
                 sleep(0.2)
                 queue.put(data)
 
@@ -298,10 +298,10 @@ class QueueTest(BaseTestCase):
         def put(iterations=iterations):
             threads.append(current_thread())
             event.wait()
-            for i in xrange(iterations):
+            for i in range(iterations):
                 queue.put({})
 
-        for i in xrange(self.base_concurrency):
+        for i in range(self.base_concurrency):
             Thread(target=put).start()
 
         while len(threads) < self.base_concurrency:
@@ -327,7 +327,7 @@ class QueueTest(BaseTestCase):
                 if item is None:
                     break
 
-        for i in xrange(self.base_concurrency):
+        for i in range(self.base_concurrency):
             Thread(target=get).start()
 
         while len(threads) < self.base_concurrency:
@@ -387,12 +387,12 @@ class QueueTest(BaseTestCase):
         warmup = '__pypy__' in sys.builtin_module_names
         c = self.base_concurrency
 
-        for x in xrange(1 + int(warmup)):
-            cs = [[] for i in xrange(c * 2)]
+        for x in range(1 + int(warmup)):
+            cs = [[] for i in range(c * 2)]
 
             threads = (
-                [Thread(target=producer) for i in xrange(c)],
-                [Thread(target=consumer, args=(cs[i], )) for i in xrange(c)],
+                [Thread(target=producer) for i in range(c)],
+                [Thread(target=consumer, args=(cs[i], )) for i in range(c)],
             )
 
             active = ([], [])
@@ -443,7 +443,7 @@ class QueueTest(BaseTestCase):
 
         def producer():
             ident = current_thread().ident
-            for i in xrange(100):
+            for i in range(100):
                 queue.put((ident, i))
 
         consumed = []
@@ -457,8 +457,8 @@ class QueueTest(BaseTestCase):
                     consumed.append(tuple(d.data))
 
         c = self.base_concurrency
-        producers = [Thread(target=producer) for i in xrange(c * 2)]
-        consumers = [Thread(target=consumer) for i in xrange(c)]
+        producers = [Thread(target=producer) for i in range(c * 2)]
+        consumers = [Thread(target=consumer) for i in range(c)]
 
         for t in producers:
             t.start()
