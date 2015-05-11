@@ -1,5 +1,10 @@
 import os
-import cPickle as pickle
+import sys
+
+if sys.version_info[0] == 2:
+    import cPickle as pickle
+else:
+    import pickle as pickle
 
 from contextlib import contextmanager
 from datetime import datetime
@@ -62,8 +67,15 @@ class QueueIterator(object):
     def __iter__(self):
         return self
 
-    def next(self):
+    def __next__(self):
+        ''' Python 3 iterator.
+        '''
         return self.queue.get(timeout=self.timeout)
+
+    def next(self):
+        ''' Python 2 iterator.
+        '''
+        return QueueIterator.__next__(self)
 
 
 class Queue(object):
@@ -81,7 +93,15 @@ class Queue(object):
     logger = getLogger('pq')
 
     converters = {
-        'pickle': (pickle.dumps, lambda data: pickle.loads(str(data))),
+        'pickle': (
+            #
+            # Pickle protocol 0 claims to be ASCII, but it outputs
+            # characters outside of range(128). So, we treat it
+            # like Latin-1 so that it can encoded into JSON UTF-8.
+            #
+            lambda data: pickle.dumps(data, 0).decode('latin-1'),
+            lambda data: pickle.loads(data.encode('latin-1'))
+            ),
     }
 
     dumps = loads = staticmethod(lambda data: data)
