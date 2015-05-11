@@ -1,7 +1,10 @@
 Changes
 =======
 
-In next release ...
+1.3 (2015-05-11)
+----------------
+
+- Python 3 compatibility. [migurski]
 
 - Fix time zone issue.
 
