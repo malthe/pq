@@ -7,7 +7,7 @@ from json import dumps
 from itertools import chain
 from time import time, sleep
 from math import sqrt
-from datetime import datetime
+from datetime import datetime, timedelta
 from contextlib import contextmanager
 from unittest import TestCase, SkipTest
 from logging import getLogger, StreamHandler, INFO
@@ -112,8 +112,8 @@ class QueueTest(BaseTestCase):
         queue.put(1, None, "1s")
         queue.put(2, None, "2s")
         queue.put(3, None, "3s")
-        queue.put(4, None, "4s")
-        queue.put(5, None, "5s")
+        queue.put(4, None, timedelta(seconds=4))
+        queue.put(5, None, timedelta(seconds=5) + datetime.utcnow())
         t = time()
         self.assertEqual(len(queue), 5)
         for i, task in enumerate(queue):
@@ -129,7 +129,7 @@ class QueueTest(BaseTestCase):
 
     def test_put_schedule_at_without_blocking(self):
         queue = self.make_one("test_schedule_at_non_blocking")
-        queue.put({'baz': 'fob'}, "6s")
+        queue.put({'baz': 'fob'}, timedelta(seconds=6))
 
         def get(block=True): return queue.get(block, 5)
 
@@ -139,8 +139,8 @@ class QueueTest(BaseTestCase):
         queue = self.make_one("test_schedule_at_blocking")
         queue.put({'bar': 'foo'})
         queue.put({'baz': 'fob'}, "6s")
-        queue.put({'foo': 'bar'}, "2s")
-        queue.put({'boo': 'baz'}, "4s")
+        queue.put({'foo': 'bar'}, timedelta(seconds=2))
+        queue.put({'boo': 'baz'}, timedelta(seconds=4) + datetime.utcnow())
 
         # We use a timeout of five seconds for this test.
         def get(block=True): return queue.get(block, 5)

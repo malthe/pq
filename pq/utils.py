@@ -1,4 +1,6 @@
-import re
+import re, sys
+
+PY2 = bool(sys.version_info[0] == 2)
 
 from contextlib import contextmanager
 from weakref import WeakKeyDictionary
@@ -76,7 +78,7 @@ def convert_time_spec(spec):
     if spec is None:
         return
 
-    if isinstance(spec, str) or isinstance(spec, unicode):
+    if isinstance(spec, str) or (PY2 and isinstance(spec, unicode)):
         m = _re_timedelta.match(spec)
         if m is None:
             raise ValueError(spec)
