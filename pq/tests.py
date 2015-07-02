@@ -279,12 +279,14 @@ class QueueTest(BaseTestCase):
         self.assertEqual(len(queue), 0)
         queue.put({'foo': 'bar'})
         self.assertEqual(len(queue), 1)
-        queue.put({'foo': 'bar'}, schedule_at='1h')
+        queue.put({'foo': 'bar'}, schedule_at='1s')
         self.assertEqual(len(queue), 1, 'Length should still be 1 with task scheduled for the future.')
         queue.put({'foo': 'bar'})
         self.assertEqual(len(queue), 2)
         queue.get()
         self.assertEqual(len(queue), 1)
+        sleep(1)
+        self.assertEqual(len(queue), 2, 'Length should be back to 2 in the future.')
 
     def test_benchmark(self, items=1000):
         if not os.environ.get("BENCHMARK"):
