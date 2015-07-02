@@ -279,6 +279,8 @@ class QueueTest(BaseTestCase):
         self.assertEqual(len(queue), 0)
         queue.put({'foo': 'bar'})
         self.assertEqual(len(queue), 1)
+        queue.put({'foo': 'bar'}, schedule_at='1h')
+        self.assertEqual(len(queue), 1, 'Length should still be 1 with task scheduled for the future.')
         queue.put({'foo': 'bar'})
         self.assertEqual(len(queue), 2)
         queue.get()
