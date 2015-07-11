@@ -317,6 +317,7 @@ class Queue(object):
 
             SELECT COUNT(*) FROM %(table)s
             WHERE q_name = %(name)s AND dequeued_at IS NULL
+              AND (schedule_at IS NULL OR schedule_at <= NOW())
 
         """
 
