@@ -1,3 +1,8 @@
+__title__ = 'pq'
+__version__ = '1.4-dev'
+__author__ = 'Malthe Borch'
+__license__ = 'BSD'
+
 import os
 import sys
 
@@ -7,7 +12,6 @@ else:
     import pickle as pickle
 
 from contextlib import contextmanager
-from datetime import datetime
 from select import select
 from logging import getLogger
 from weakref import WeakValueDictionary
