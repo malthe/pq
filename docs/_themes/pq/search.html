@@ -1,0 +1,31 @@
+{% extends "layout.html" %}
+{% set title = 'Search' %}
+
+{% block title %}
+{% endblock %}
+
+{% block extrahead %}
+  <script type="text/javascript" src="{{ pathto('_static/searchtools.js', 1) }}"></script>
+  <script type="text/javascript">
+    jQuery(function() { Search.loadIndex("{{ pathto('searchindex.js', 1) }}"); });
+  </script>
+{% endblock %}
+
+{% block body %}
+  {% if search_performed %}
+    {% if not search_results %}
+      <p>We could not find anything, please try again...</p>
+    {% endif %}
+  {% endif %}
+
+  <section id="search-results">
+  {% if search_results %}
+    {% for href, caption, context in search_results %}
+    <section>
+      <a href="{{ pathto(item.href) }}">{{ caption }}</a>
+      <p class="context">{{ context|e }}</p>
+    </section>
+    {% endfor %}
+  {% endif %}
+  </section>
+{% endblock %}
