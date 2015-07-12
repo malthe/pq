@@ -2,12 +2,14 @@
 
 from setuptools import setup, find_packages
 
+import pq
+
 setup(
-    name='pq',
-    version='1.4-dev',
+    name=pq.__title__,
+    version=pq.__version__,
+    license=pq.__license__,
+    author=pq.__author__,
     url='https://github.com/malthe/pq/',
-    license='BSD',
-    author='Malthe Borch',
     author_email='mborch@gmail.com',
     description=__doc__,
     long_description='\n\n'.join((

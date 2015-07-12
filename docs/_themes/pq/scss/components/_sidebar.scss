@@ -1,0 +1,70 @@
+.sidebar {
+  @include span-columns(3.5);
+  padding: 0 25px;
+
+  @include media($ipad) {
+    width: 100%;
+  }
+}
+
+.item {
+  padding: 15px 30px;
+  margin-bottom: 25px;
+  border-radius: 3px;
+  background-color: tint($grey, 50%);
+
+  a {
+    display: block;
+    padding: 0.2em 0;
+  }
+
+  ul {
+    padding: 0 0 0 15px;
+  }
+
+  iframe {
+    margin: 50px 0 15px 0;
+
+    @include media($ipad) {
+      margin: 15px 0;
+    }
+  }
+
+  @include media($ipad) {
+    > ul {
+      display: none;
+    }
+  }
+}
+
+.item-heading {
+  position: relative;
+  margin: 15px 0;
+  color: tint($black, 50%);
+  text-transform: uppercase;
+  @include transition(color, 0.2s);
+
+  span {
+    position: absolute;
+    top: 5px;
+    right: 0;
+    display: none;
+  }
+
+  @include media($ipad) {
+    &:hover {
+      color: tint($black, 30%);
+      cursor: pointer;
+    }
+
+    &.active {
+      + ul {
+        display: block;
+      }
+    }
+
+    span {
+      display: block;
+    }
+  }
+}

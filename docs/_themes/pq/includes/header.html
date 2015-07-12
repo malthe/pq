@@ -1,0 +1,16 @@
+<div class="header">
+
+    <a class="logo" href="{{ pathto(master_doc) }}">
+      {{ shorttitle|striptags|e }}
+    </a>
+
+    {% if builder != "singlehtml" %}
+      <form class="searchbar" action="{{ pathto('search') }}" method="get">
+        <label class="icon-magnifying-glass"></label>
+        <input type="text" name="q" placeholder="Search..." />
+        <input type="hidden" name="check_keywords" value="yes" />
+        <input type="hidden" name="area" value="default" />
+      </form>
+    {% endif %}
+
+</div>

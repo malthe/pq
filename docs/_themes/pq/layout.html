@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+
+  <title>{{ title|striptags|e }} &bull; {{ shorttitle }}</title>
+
+  <meta charset="{{ encoding }}">
+  <meta name="keywords" content="transactional queue system python postgresql">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+
+  {{ metatags }}
+
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/normalize/3.0.3/normalize.css" type="text/css">
+  <script async defer id="github-bjs" src="https://buttons.github.io/buttons.js"></script>
+
+  {% import 'basic/layout.html' as basic_layout with context %}
+  {{ basic_layout.script() }}
+  {{ basic_layout.css() }}
+
+
+  {% block extrahead %}{% endblock %}
+
+  <body>
+
+    <div class="wrap">
+
+      {% include 'includes/header.html' with context %}
+
+      {% include 'includes/sidebar.html' %}
+
+      <div class="content">
+        <div class="page-heading">
+          <h1>{% block title %}{{ title }}{% endblock %}</h1>
+        </div>
+
+        <div class="contents">
+          {% block body %}{% endblock %}
+        </div>
+      </div>
+
+      {% include 'includes/footer.html' %}
+
+    </div>
+
+  </body>
+
+</html>
