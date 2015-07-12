@@ -1,0 +1,20 @@
+.footer {
+  padding: 20px 25px;
+  @include shift(3.5);
+  @include clearfix;
+  clear: both;
+
+  @include media($ipad) {
+    @include shift(0);
+  }
+}
+
+.copyright {
+  padding: 20px 0;
+  color: shade($grey, 20%);
+  font-size: em(18, 12);
+
+  @include media($iphone) {
+    font-size: em(14, 12);
+  }
+}

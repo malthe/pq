@@ -1,0 +1,45 @@
+.header {
+  padding: 45px 25px;
+  margin: 0 0 45px 0;
+  border-bottom: 1px solid $grey;
+  @include clearfix;
+}
+
+
+.logo {
+  @include span-columns(3);
+  min-height: 55px;
+  background: image-url('logo.svg') no-repeat center center;
+  background-size: 90%;
+  @include hide-text;
+
+  @include media($ipad) {
+    width: 85px;
+    background-size: auto;
+    background-position: left top;
+  }
+}
+
+
+.search {
+  position: relative;
+  @include span-columns(8.5);
+  @include omega;
+  float: right;
+
+  input {
+    width: 100%;
+    padding: 15px 40px 15px 15px;
+  }
+
+  label {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+  }
+
+  @include media($iphone) {
+    @include span-columns(7);
+    float: right;
+  }
+}

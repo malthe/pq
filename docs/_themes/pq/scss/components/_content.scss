@@ -1,0 +1,85 @@
+.content {
+  @include span-columns(8);
+  @include omega;
+  padding: 0 25px;
+
+  p {
+    max-width: 85%;
+    padding: 10px 0;
+    font-size: em(16, 14);
+
+    @include media($ipad) {
+      max-width: 100%;
+    }
+
+    @include media($iphone) {
+      font-size: em(12, 14);
+    }
+  }
+
+  @include media($ipad) {
+    width: 100%;
+  }
+}
+
+.page-heading {
+  max-width: 80%;
+
+  @include media($ipad) {
+    max-width: 100%;
+  }
+}
+
+.insert {
+  padding: 0 0 15px 0;
+
+  p {
+    color: shade($grey, 20%);
+  }
+}
+
+.contents {
+  counter-reset: section;
+
+  &:after {
+    content: "";
+    display: block;
+    width: 30%;
+    height: 0;
+    margin: 20px 0 0 0;
+    border-top: 1px solid $grey;
+  }
+
+  .section {
+    position: relative;
+    padding: 15px 0 15px 30px;
+
+    &:before {
+      content: counter(section) "/";
+      counter-increment: section;
+      position: absolute;
+      top: 15px;
+      left: 0;
+      display: inline-block;
+      font-size: em(24, 14);
+    }
+
+    @include media($iphone) {
+      &:before {
+        font-size: em(18, 14);
+      }
+    }
+  }
+
+  p {
+    max-width: 60%;
+
+    @include media($ipad) {
+      max-width: 100%;
+    }
+  }
+
+  h2 {
+    margin-top: 0;
+  }
+}

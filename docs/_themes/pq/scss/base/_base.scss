@@ -1,0 +1,80 @@
+body {
+  font: 14px/1.5 $georgia;
+  -webkit-font-smoothing: antialiased;
+}
+
+*, *:before, *:after {
+  @include box-sizing(border-box);
+}
+
+.wrap {
+  @include outer-container;
+}
+
+h1 {
+  font-size: em(36, 14);
+  font-weight: normal;
+  line-height: 1.4em;
+
+  @include media($iphone) {
+    font-size: em(20, 14);
+  }
+}
+
+h2 {
+  font-size: em(24, 14);
+  font-weight: normal;
+
+  @include media($iphone) {
+    font-size: em(18, 14);
+  }
+}
+
+a {
+  color: $blue;
+  text-decoration: none;
+  outline: none;
+  @include transition(color, 0.2s);
+
+  &:focus, &:active {
+    outline: none;
+  }
+
+  &:hover {
+    color: shade($blue, 20%);
+  }
+}
+
+img {
+  width: 100%;
+  height: auto;
+}
+
+ul {
+  list-style-type: disc;
+}
+
+li {
+  padding: 0.2em 0;
+}
+
+input {
+  outline: none;
+  border: 1px solid $grey;
+  border-radius: 5px;
+  @include transition(border-color, 0.2s);
+
+  @include placeholder {
+    text-transform: capitalize;
+  }
+
+  &:focus {
+    border-color: tint($blue, 20%);
+  }
+}
+
+pre {
+  padding: 30px 35px;
+  background-color: tint($grey, 50%);
+  white-space: pre-line;
+}
