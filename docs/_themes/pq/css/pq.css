@@ -257,6 +257,12 @@ pre {
   .contents .section {
     position: relative;
     padding: 15px 0 15px 30px; }
+    .contents .section:first-child {
+      padding: 0px 0 0px 0px; }
+      .contents .section:first-child:before {
+        content: none; }
+      .contents .section:first-child h1 {
+        display: none ; }
     .contents .section:before {
       content: counter(section) "/";
       counter-increment: section;
@@ -268,11 +274,6 @@ pre {
     @media screen and (max-width: 480px) {
       .contents .section:before {
         font-size: 1.28571em; } }
-  .contents p {
-    max-width: 60%; }
-    @media screen and (max-width: 975px) {
-      .contents p {
-        max-width: 100%; } }
   .contents h2 {
     margin-top: 0; }
 

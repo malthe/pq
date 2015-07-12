@@ -1,4 +1,10 @@
-PQ is a transactional queue system for PostgreSQL written in Python.
+PQ
+**
+
+A transactional queue system for PostgreSQL written in Python.
+
+.. figure:: https://malthe.github.io/_static/intro.svg
+   :alt: PQ does the job!
 
 It allows you to push and pop items in and out of a queue in various
 ways and also provides two scheduling options: delayed processing and
