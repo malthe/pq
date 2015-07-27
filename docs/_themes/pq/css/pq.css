@@ -67,6 +67,8 @@ a {
     outline: none; }
   a:hover {
     color: #4882b9; }
+  a.headerlink {
+    display: none; }
 
 img {
   width: 100%;
