@@ -234,7 +234,7 @@ class Queue(object):
             yield self.conn
 
     def _listen(self, cursor):
-        cursor.execute("LISTEN %s", (Literal(self.name), ))
+        cursor.execute('LISTEN "%s"', (Literal(self.name), ))
 
     @prepared
     def _put_item(self, cursor):
