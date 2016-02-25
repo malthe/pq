@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 from logging import getLogger
 from functools import wraps
-from . import Queue as BaseQueue
+from . import (
+    PQ as BasePQ,
+    Queue as BaseQueue,
+)
 
 
 def task(queue, *job_args, **job_kwargs):
@@ -70,3 +73,7 @@ class Worker(object):
             except Exception as e:
                 self.logger.warning("Failed to perform job %r :" % job)
                 self.logger.exception(e)
+
+
+class PQ(BasePQ):
+    queue_class = Queue
