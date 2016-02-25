@@ -17,6 +17,15 @@ from psycopg2cffi.pool import ThreadedConnectionPool
 from psycopg2cffi import ProgrammingError
 from psycopg2cffi.extensions import cursor
 
+
+from pq.handlers import (
+    handler,
+    handler_registry,
+    perform,
+    Worker
+)
+
+
 # Set up logging such that we can quickly enable logging for a
 # particular queue instance (via the `logging` flag).
 getLogger('pq').setLevel(INFO)
@@ -529,12 +538,6 @@ class QueueTest(BaseTestCase):
 
 class HandlerTest(BaseTestCase):
     def test_handler(self):
-        from pq.handlers import (
-            handler,
-            handler_registry,
-            perform,
-        )
-
         self.assertEqual(len(handler_registry), 0)
 
         queue = self.make_one("jobs")
@@ -560,8 +563,6 @@ class HandlerTest(BaseTestCase):
         del test_value
 
     def test_handler_arguments(self):
-        from pq.handlers import handler
-
         queue = self.make_one("jobs")
 
         @handler(queue, None, expected_at='1s')
@@ -573,3 +574,47 @@ class HandlerTest(BaseTestCase):
         task = queue.get()
         self.assertFalse(task is None)
         self.assertFalse(task.expected_at is None)
+
+    def test_worker(self):
+        queue = self.make_one("jobs")
+
+        global test_value
+        test_value = 1
+
+        @handler(queue)
+        def task_handler(increment):
+            global test_value
+            test_value += increment
+            return True
+
+        task_handler(26)
+
+        self.assertEqual(test_value, 1)
+        Worker(queue).work(True)
+        self.assertEqual(test_value, 27)
+
+        del test_value
+
+    def test_worker_no_breaking_exception(self):
+        queue = self.make_one("jobs")
+
+        global test_value
+        test_value = 3
+
+        @handler(queue)
+        def task_handler(increment):
+            if increment < 0:
+                raise Exception()
+
+            global test_value
+            test_value += increment
+            return True
+
+        task_handler(-100)
+        task_handler(2)
+
+        self.assertEqual(test_value, 3)
+        Worker(queue).work(True)
+        self.assertEqual(test_value, 5)
+
+        del test_value

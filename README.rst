@@ -233,7 +233,12 @@ Each call is then put within given ``queue``.
             perform(task)
 
 
-This allows to lazily design workers that manage several ``task`` types.
+A ``Worker`` can be initialized to perform available tasks using
+correct ``handlers``:
+
+.. code-block:: python
+
+    Worker(queue).work()
 
 
 Thread-safety
