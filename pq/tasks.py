@@ -1,16 +1,14 @@
 # -*- coding: utf-8 -*-
 from logging import getLogger
 from functools import wraps
+from . import Queue as BaseQueue
 
 
-handler_registry = dict()
-
-
-def handler(queue, *job_args, **job_kwargs):
+def task(queue, *job_args, **job_kwargs):
     def decorator(f):
         f._path = "%s.%s" % (f.__module__, f.__name__)
 
-        handler_registry[f._path] = f
+        queue.handler_registry[f._path] = f
 
         @wraps(f)
         def wrapper(*args, **kwargs):
@@ -29,9 +27,19 @@ def handler(queue, *job_args, **job_kwargs):
     return decorator
 
 
-def perform(job):
+class Queue(BaseQueue):
+    handler_registry = dict()
+
+    task = task
+
+
+def perform(queue, job):
     data = job.data
-    return handler_registry[data['function']](*data['args'], **data['kwargs'])
+    return (
+        queue.handler_registry
+        [data['function']]
+        (*data['args'], **data['kwargs'])
+    )
 
 
 class Worker(object):
@@ -57,7 +65,7 @@ class Worker(object):
                 continue
 
             try:
-                self.performer(job)
+                self.performer(queue, job)
 
             except Exception as e:
                 self.logger.warning("Failed to perform job %r :" % job)

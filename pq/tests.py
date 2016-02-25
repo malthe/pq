@@ -17,11 +17,14 @@ from psycopg2cffi.pool import ThreadedConnectionPool
 from psycopg2cffi import ProgrammingError
 from psycopg2cffi.extensions import cursor
 
+from pq import (
+    PQ,
+    Queue,
+)
 
 from pq.tasks import (
-    handler,
-    handler_registry,
     perform,
+    Queue as TaskQueue,
     Worker
 )
 
@@ -59,15 +62,16 @@ class LoggingCursor(cursor):
 class BaseTestCase(TestCase):
     base_concurrency = 1
 
+    queue_class = Queue
+
     @classmethod
     def setUpClass(cls):
         c = cls.base_concurrency * 4
         pool = cls.pool = ThreadedConnectionPool(
             c, c, "dbname=pq_test user=postgres",
         )
-        from pq import PQ
         cls.pq = PQ(
-            pool=pool, table="queue",
+            pool=pool, table="queue", queue_class=cls.queue_class,
         )
 
         try:
@@ -536,36 +540,38 @@ class QueueTest(BaseTestCase):
         self.assertEqual(queue.get(), None)
 
 
-class HandlerTest(BaseTestCase):
-    def test_handler(self):
-        self.assertEqual(len(handler_registry), 0)
+class TaskTest(BaseTestCase):
+    queue_class = TaskQueue
 
+    def test_task(self):
         queue = self.make_one("jobs")
+
+        self.assertEqual(len(queue.handler_registry), 0)
 
         global test_value
         test_value = 0
 
-        @handler(queue)
+        @queue.task()
         def job_handler(increment):
             global test_value
             test_value += increment
             return True
 
-        self.assertEqual(len(handler_registry), 1)
+        self.assertEqual(len(queue.handler_registry), 1)
         self.assertEqual(job_handler._path, 'pq.tests.job_handler')
-        self.assertIn(job_handler._path, handler_registry)
+        self.assertIn(job_handler._path, queue.handler_registry)
 
         job_handler(12)
         self.assertEqual(test_value, 0)
         self.assertEqual(len(queue), 1)
-        self.assertTrue(perform(queue.get()))
+        self.assertTrue(perform(queue, queue.get()))
         self.assertEqual(test_value, 12)
         del test_value
 
-    def test_handler_arguments(self):
+    def test_task_arguments(self):
         queue = self.make_one("jobs")
 
-        @handler(queue, None, expected_at='1s')
+        @queue.task(None, expected_at='1s')
         def job_handler(value):
             return value
 
@@ -581,7 +587,7 @@ class HandlerTest(BaseTestCase):
         global test_value
         test_value = 1
 
-        @handler(queue)
+        @queue.task()
         def job_handler(increment):
             global test_value
             test_value += increment
@@ -601,7 +607,7 @@ class HandlerTest(BaseTestCase):
         global test_value
         test_value = 3
 
-        @handler(queue)
+        @queue.task()
         def job_handler(increment):
             if increment < 0:
                 raise Exception()
