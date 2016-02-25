@@ -1,6 +1,6 @@
-import re, sys
-
-PY2 = bool(sys.version_info[0] == 2)
+# -*- coding: utf-8 -*-
+import re
+import sys
 
 from contextlib import contextmanager
 from weakref import WeakKeyDictionary
@@ -8,6 +8,10 @@ from functools import wraps
 from textwrap import dedent
 from logging import getLogger
 from datetime import datetime, timedelta
+
+
+PY2 = bool(sys.version_info[0] == 2)
+
 
 logger = getLogger("pq")
 
