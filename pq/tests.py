@@ -123,6 +123,7 @@ class QueueTest(BaseTestCase):
             self.assertEqual(i + 1, task.data)
             d = time() - t
             self.assertTrue(d < 1)
+            self.assertFalse(task.expected_at is None)
 
         # We expect five plus the empty.
         self.assertEqual(i, 5)

@@ -163,7 +163,15 @@ class Queue(object):
 
         while True:
             with self._transaction() as cursor:
-                task_id, data, size, te, ts, seconds = self._pull_item(
+                (
+                    task_id,
+                    data,
+                    size,
+                    enqueued_at,
+                    schedule_at,
+                    expected_at,
+                    seconds,
+                ) = self._pull_item(
                     cursor, block
                 )
                 self.last_timeout = (
@@ -177,7 +185,7 @@ class Queue(object):
 
                 return Task(
                     task_id, self.loads(data), size,
-                    te, ts, self.update
+                    enqueued_at, schedule_at, expected_at, self.update
                 )
 
             if not block:
@@ -303,6 +311,7 @@ class Queue(object):
                id, data, length(data::text),
                enqueued_at AT TIME ZONE 'utc',
                schedule_at AT TIME ZONE 'utc',
+               expected_at AT TIME ZONE 'utc',
                (SELECT seconds FROM next_timeout)
 
         If `blocking` is set, the item blocks until an item is ready
@@ -316,7 +325,7 @@ class Queue(object):
             if blocking:
                 self._listen(cursor)
 
-            return None, None, None, None, None, None
+            return None, None, None, None, None, None, None
 
         return row
 
@@ -360,26 +369,43 @@ class Queue(object):
 class Task(object):
     """An item in the queue."""
 
-    __slots__ = "_data", "_size", "_update", "id", "enqueued_at", "schedule_at"
+    __slots__ = (
+        "_data", "_size", "_update", "id", "enqueued_at", "schedule_at",
+        "expected_at",
+    )
 
-    def __init__(self, task_id, data, size, enqueued_at, schedule_at, update):
+    def __init__(
+        self,
+        task_id,
+        data,
+        size,
+        enqueued_at,
+        schedule_at,
+        expected_at,
+        update
+    ):
         self._data = data
         self._size = size
         self._update = update
         self.id = task_id
         self.enqueued_at = enqueued_at
         self.schedule_at = schedule_at
+        self.expected_at = expected_at
 
     def __repr__(self):
         cls = type(self)
-        return ('<%s.%s id=%d size=%d enqueued_at=%r schedule_at=%r>' % (
-            cls.__module__,
-            cls.__name__,
-            self.id,
-            self.size,
-            utc_format(self.enqueued_at),
-            utc_format(self.schedule_at) if self.schedule_at else None,
-        )).replace("'", '"')
+        return (
+            '<%s.%s id=%d size=%d enqueued_at=%r '
+            'schedule_at=%r expected_at=%r>' % (
+                cls.__module__,
+                cls.__name__,
+                self.id,
+                self.size,
+                utc_format(self.enqueued_at),
+                utc_format(self.schedule_at) if self.schedule_at else None,
+                utc_format(self.expected_at) if self.expected_at else None,
+            )
+        ).replace("'", '"')
 
     @property
     def size(self):
