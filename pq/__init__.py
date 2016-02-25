@@ -1,15 +1,6 @@
-__title__ = 'pq'
-__version__ = '1.4-dev'
-__author__ = 'Malthe Borch'
-__license__ = 'BSD'
-
+# -*- coding: utf-8 -*-
 import os
 import sys
-
-if sys.version_info[0] == 2:
-    import cPickle as pickle
-else:
-    import pickle as pickle
 
 from contextlib import contextmanager
 from select import select
@@ -21,6 +12,18 @@ from json import dumps
 from .utils import (
     Literal, prepared, transaction, convert_time_spec, utc_format
 )
+
+
+__title__ = 'pq'
+__version__ = '1.4-dev'
+__author__ = 'Malthe Borch'
+__license__ = 'BSD'
+
+
+if sys.version_info[0] == 2:
+    import cPickle as pickle
+else:
+    import pickle as pickle
 
 
 class PQ(object):
@@ -163,7 +166,9 @@ class Queue(object):
                 task_id, data, size, te, ts, seconds = self._pull_item(
                     cursor, block
                 )
-                self.last_timeout = seconds or self.last_timeout or self.timeout
+                self.last_timeout = (
+                    seconds or self.last_timeout or self.timeout
+                )
 
             if data is not None:
                 # Reset the timeout if there's no esitmation
