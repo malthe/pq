@@ -525,3 +525,51 @@ class QueueTest(BaseTestCase):
 
         self.assertRaises(ValueError, test)
         self.assertEqual(queue.get(), None)
+
+
+class HandlerTest(BaseTestCase):
+    def test_handler(self):
+        from pq.handlers import (
+            handler,
+            handler_registry,
+            perform,
+        )
+
+        self.assertEqual(len(handler_registry), 0)
+
+        queue = self.make_one("jobs")
+
+        global test_value
+        test_value = 0
+
+        @handler(queue)
+        def task_handler(increment):
+            global test_value
+            test_value += increment
+            return True
+
+        self.assertEqual(len(handler_registry), 1)
+        self.assertEqual(task_handler._path, 'pq.tests.task_handler')
+        self.assertIn(task_handler._path, handler_registry)
+
+        task_handler(12)
+        self.assertEqual(test_value, 0)
+        self.assertEqual(len(queue), 1)
+        self.assertTrue(perform(queue.get()))
+        self.assertEqual(test_value, 12)
+        del test_value
+
+    def test_handler_arguments(self):
+        from pq.handlers import handler
+
+        queue = self.make_one("jobs")
+
+        @handler(queue, None, expected_at='1s')
+        def task_handler(value):
+            return value
+
+        task_handler('test')
+
+        task = queue.get()
+        self.assertFalse(task is None)
+        self.assertFalse(task.expected_at is None)

@@ -203,6 +203,39 @@ encoded as ``ascii`` which should be compatible with any database
 encoding.
 
 
+Handlers
+========
+
+A callable can be flagged as a ``task`` handler using the ``handler``
+decorator.
+
+Each call is then put within given ``queue``.
+
+
+.. code-block:: python
+
+    from pq.handlers import (
+        handler,
+        perform,
+    )
+
+
+    @handler(queue, schedule_at='1h')
+    def eat(kind):
+        print 'umm, %s apples taste good.' % kind
+
+
+    eat('Cox')
+
+
+    for task in queue:
+        if task is not None:
+            perform(task)
+
+
+This allows to lazily design workers that manage several ``task`` types.
+
+
 Thread-safety
 =============
 
