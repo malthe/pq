@@ -10,7 +10,7 @@ It allows you to push and pop items in and out of a queue in various
 ways and also provides two scheduling options: delayed processing and
 prioritization.
 
-The system uses a single table that holds all tasks across queues; the
+The system uses a single table that holds all jobs across queues; the
 specifics are easy to customize.
 
 The system currently supports only the `psycopg2
@@ -83,8 +83,8 @@ manages a transaction:
 
 The statements inside the context manager are either committed as a
 transaction or rejected, atomically. This is useful when a queue is
-used to manage tasks because it allows you to retrieve a task from the
-queue, perform a task and write a result, with transactional
+used to manage jobs because it allows you to retrieve a job from the
+queue, perform a job and write a result, with transactional
 semantics.
 
 Methods
@@ -108,24 +108,24 @@ timeout of one second after which a value of ``None`` is returned.
     def eat(kind):
         print 'umm, %s apples taste good.' % kind
 
-    task = queue.get()
-    eat(**task.data)
+    job = queue.get()
+    eat(**job.data)
 
-The ``task`` object provides additional metadata in addition to the
+The ``job`` object provides additional metadata in addition to the
 ``data`` attribute as illustrated by the string representation:
 
-    >>> task
-    <pq.Task id=77709 size=1 enqueued_at="2014-02-21T16:22:06Z" schedule_at=None>
+    >>> job
+    <pq.Job id=77709 size=1 enqueued_at="2014-02-21T16:22:06Z" schedule_at=None>
 
 The ``get`` operation is also available through iteration:
 
 .. code-block:: python
 
-    for task in queue:
-        if task is None:
+    for job in queue:
+        if job is None:
             break
 
-        eat(**task.data)
+        eat(**job.data)
 
 The iterator blocks if no item is available. Again, there is a default
 timeout of one second, after which the iterator yields a value of
@@ -136,9 +136,9 @@ for an item to be ready.
 
 .. code-block:: python
 
-    for task in queue:
-        if task is not None:
-            eat(**task.data)
+    for job in queue:
+        if job is not None:
+            eat(**job.data)
 
         # This is an infinite loop!
 

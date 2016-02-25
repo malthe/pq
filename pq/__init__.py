@@ -164,7 +164,7 @@ class Queue(object):
         while True:
             with self._transaction() as cursor:
                 (
-                    task_id,
+                    job_id,
                     data,
                     size,
                     enqueued_at,
@@ -183,8 +183,8 @@ class Queue(object):
                 if seconds is None:
                     self.last_timeout = self.timeout
 
-                return Task(
-                    task_id, self.loads(data), size,
+                return Job(
+                    job_id, self.loads(data), size,
                     enqueued_at, schedule_at, expected_at, self.update
                 )
 
@@ -222,12 +222,12 @@ class Queue(object):
                 utc_format(expected_at) if expected_at is not None else None,
             )
 
-    def update(self, task_id, data):
-        """Update task data."""
+    def update(self, job_id, data):
+        """Update job data."""
 
         with self._transaction() as cursor:
             return self._update_item(
-                cursor, task_id, dumps(self.dumps(data))
+                cursor, job_id, dumps(self.dumps(data))
             )
 
     def clear(self):
@@ -366,7 +366,7 @@ class Queue(object):
             yield cursor
 
 
-class Task(object):
+class Job(object):
     """An item in the queue."""
 
     __slots__ = (
@@ -376,7 +376,7 @@ class Task(object):
 
     def __init__(
         self,
-        task_id,
+        job_id,
         data,
         size,
         enqueued_at,
@@ -387,7 +387,7 @@ class Task(object):
         self._data = data
         self._size = size
         self._update = update
-        self.id = task_id
+        self.id = job_id
         self.enqueued_at = enqueued_at
         self.schedule_at = schedule_at
         self.expected_at = expected_at

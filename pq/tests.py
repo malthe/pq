@@ -125,14 +125,14 @@ class QueueTest(BaseTestCase):
         queue.put(5, None, timedelta(seconds=5) + datetime.utcnow())
         t = time()
         self.assertEqual(len(queue), 5)
-        for i, task in enumerate(queue):
-            if task is None:
+        for i, job in enumerate(queue):
+            if job is None:
                 break
 
-            self.assertEqual(i + 1, task.data)
+            self.assertEqual(i + 1, job.data)
             d = time() - t
             self.assertTrue(d < 1)
-            self.assertFalse(task.expected_at is None)
+            self.assertFalse(job.expected_at is None)
 
         # We expect five plus the empty.
         self.assertEqual(i, 5)
@@ -177,19 +177,19 @@ class QueueTest(BaseTestCase):
     def test_get_and_set(self):
         queue = self.make_one("test")
         queue.put({'foo': 'bar'})
-        task = queue.get()
-        self.assertEqual(task.data, {'foo': 'bar'})
-        task.data = {'foo': 'boo'}
+        job = queue.get()
+        self.assertEqual(job.data, {'foo': 'bar'})
+        job.data = {'foo': 'boo'}
 
         with queue._transaction() as cursor:
             cursor.execute(
                 "SELECT data FROM %s WHERE id = %s",
-                (queue.table, task.id)
+                (queue.table, job.id)
             )
             data = cursor.fetchone()[0]
 
-        self.assertEqual(task.data, data)
-        self.assertIn('size=%d' % len(dumps(data)), repr(task))
+        self.assertEqual(job.data, data)
+        self.assertIn('size=%d' % len(dumps(data)), repr(job))
 
     def test_get_not_empty(self):
         queue = self.make_one("test")
@@ -273,8 +273,8 @@ class QueueTest(BaseTestCase):
         try:
             while True:
                 t = time()
-                i, task = next(iterator)
-                self.assertEqual(data, task.data, (i, time() - t))
+                i, job = next(iterator)
+                self.assertEqual(data, job.data, (i, time() - t))
                 dt.append(time() - t)
                 if i == 5:
                     break
@@ -293,7 +293,7 @@ class QueueTest(BaseTestCase):
         self.assertEqual(
             len(queue),
             1,
-            'Length should still be 1 with task scheduled for the future.',
+            'Length should still be 1 with job scheduled for the future.',
         )
         queue.put({'foo': 'bar'})
         self.assertEqual(len(queue), 2)
@@ -502,27 +502,27 @@ class QueueTest(BaseTestCase):
         with queue:
             queue.put({'foo': 'bar'})
 
-        task = queue.get()
-        self.assertEqual(task.data, {'foo': 'bar'})
+        job = queue.get()
+        self.assertEqual(job.data, {'foo': 'bar'})
 
     def test_context_manager_get_and_set(self):
         queue = self.make_one("test")
         queue.put({'foo': 'bar'})
 
         with queue:
-            task = queue.get()
-            self.assertEqual(task.data, {'foo': 'bar'})
-            task.data = {'foo': 'boo'}
+            job = queue.get()
+            self.assertEqual(job.data, {'foo': 'bar'})
+            job.data = {'foo': 'boo'}
 
         with queue as cursor:
             cursor.execute(
                 "SELECT data FROM %s WHERE id = %s",
-                (queue.table, task.id)
+                (queue.table, job.id)
             )
             data = cursor.fetchone()[0]
 
-        self.assertEqual(task.data, data)
-        self.assertIn('size=%d' % len(dumps(data)), repr(task))
+        self.assertEqual(job.data, data)
+        self.assertIn('size=%d' % len(dumps(data)), repr(job))
 
     def test_context_manager_exception(self):
         queue = self.make_one("test")
@@ -546,16 +546,16 @@ class HandlerTest(BaseTestCase):
         test_value = 0
 
         @handler(queue)
-        def task_handler(increment):
+        def job_handler(increment):
             global test_value
             test_value += increment
             return True
 
         self.assertEqual(len(handler_registry), 1)
-        self.assertEqual(task_handler._path, 'pq.tests.task_handler')
-        self.assertIn(task_handler._path, handler_registry)
+        self.assertEqual(job_handler._path, 'pq.tests.job_handler')
+        self.assertIn(job_handler._path, handler_registry)
 
-        task_handler(12)
+        job_handler(12)
         self.assertEqual(test_value, 0)
         self.assertEqual(len(queue), 1)
         self.assertTrue(perform(queue.get()))
@@ -566,14 +566,14 @@ class HandlerTest(BaseTestCase):
         queue = self.make_one("jobs")
 
         @handler(queue, None, expected_at='1s')
-        def task_handler(value):
+        def job_handler(value):
             return value
 
-        task_handler('test')
+        job_handler('test')
 
-        task = queue.get()
-        self.assertFalse(task is None)
-        self.assertFalse(task.expected_at is None)
+        job = queue.get()
+        self.assertFalse(job is None)
+        self.assertFalse(job.expected_at is None)
 
     def test_worker(self):
         queue = self.make_one("jobs")
@@ -582,12 +582,12 @@ class HandlerTest(BaseTestCase):
         test_value = 1
 
         @handler(queue)
-        def task_handler(increment):
+        def job_handler(increment):
             global test_value
             test_value += increment
             return True
 
-        task_handler(26)
+        job_handler(26)
 
         self.assertEqual(test_value, 1)
         Worker(queue).work(True)
@@ -602,7 +602,7 @@ class HandlerTest(BaseTestCase):
         test_value = 3
 
         @handler(queue)
-        def task_handler(increment):
+        def job_handler(increment):
             if increment < 0:
                 raise Exception()
 
@@ -610,8 +610,8 @@ class HandlerTest(BaseTestCase):
             test_value += increment
             return True
 
-        task_handler(-100)
-        task_handler(2)
+        job_handler(-100)
+        job_handler(2)
 
         self.assertEqual(test_value, 3)
         Worker(queue).work(True)

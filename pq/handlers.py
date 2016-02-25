@@ -6,7 +6,7 @@ from functools import wraps
 handler_registry = dict()
 
 
-def handler(queue, *task_args, **task_kwargs):
+def handler(queue, *job_args, **job_kwargs):
     def decorator(f):
         f._path = "%s.%s" % (f.__module__, f.__name__)
 
@@ -20,8 +20,8 @@ def handler(queue, *task_args, **task_kwargs):
                     args=args,
                     kwargs=kwargs,
                 ),
-                *task_args,
-                **task_kwargs
+                *job_args,
+                **job_kwargs
             )
 
         return wrapper
@@ -29,13 +29,13 @@ def handler(queue, *task_args, **task_kwargs):
     return decorator
 
 
-def perform(task):
-    data = task.data
+def perform(job):
+    data = job.data
     return handler_registry[data['function']](*data['args'], **data['kwargs'])
 
 
 class Worker(object):
-    """Worker that performed available tasks within a given queue.
+    """Worker that performed available jobs within a given queue.
     """
     logger = getLogger('pq.handlers')
 
@@ -44,21 +44,21 @@ class Worker(object):
         self.performer = perform
 
     def work(self, burst=False):
-        """Starts processing tasks."""
+        """Starts processing jobs."""
         queue = self.queue
 
         self.logger.info('Starting new worker for queue `%s`' % queue.name)
 
-        for task in queue:
-            if task is None:
+        for job in queue:
+            if job is None:
                 if burst:
                     return
 
                 continue
 
             try:
-                self.performer(task)
+                self.performer(job)
 
             except Exception as e:
-                self.logger.warning("Failed to perform task %r :" % task)
+                self.logger.warning("Failed to perform job %r :" % job)
                 self.logger.exception(e)
