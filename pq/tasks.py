@@ -32,35 +32,23 @@ def task(queue, *job_args, **job_kwargs):
 
 class Queue(BaseQueue):
     handler_registry = dict()
+    logger = getLogger('pq.tasks')
+
+    def perform(queue, job):
+        data = job.data
+        return (
+            queue.handler_registry
+            [data['function']]
+            (*data['args'], **data['kwargs'])
+        )
 
     task = task
 
-
-def perform(queue, job):
-    data = job.data
-    return (
-        queue.handler_registry
-        [data['function']]
-        (*data['args'], **data['kwargs'])
-    )
-
-
-class Worker(object):
-    """Worker that performed available jobs within a given queue.
-    """
-    logger = getLogger('pq.handlers')
-
-    def __init__(self, queue, performer=perform):
-        self.queue = queue
-        self.performer = perform
-
     def work(self, burst=False):
         """Starts processing jobs."""
-        queue = self.queue
+        self.logger.info('`%s` starting to perform jobs' % self.name)
 
-        self.logger.info('Starting new worker for queue `%s`' % queue.name)
-
-        for job in queue:
+        for job in self:
             if job is None:
                 if burst:
                     return
@@ -68,7 +56,7 @@ class Worker(object):
                 continue
 
             try:
-                self.performer(queue, job)
+                self.perform(job)
 
             except Exception as e:
                 self.logger.warning("Failed to perform job %r :" % job)

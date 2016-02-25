@@ -22,11 +22,7 @@ from pq import (
     Queue,
 )
 
-from pq.tasks import (
-    perform,
-    Queue as TaskQueue,
-    Worker
-)
+from pq.tasks import Queue as TaskQueue
 
 
 # Set up logging such that we can quickly enable logging for a
@@ -564,7 +560,7 @@ class TaskTest(BaseTestCase):
         job_handler(12)
         self.assertEqual(test_value, 0)
         self.assertEqual(len(queue), 1)
-        self.assertTrue(perform(queue, queue.get()))
+        self.assertTrue(queue.perform(queue.get()))
         self.assertEqual(test_value, 12)
         del test_value
 
@@ -581,7 +577,7 @@ class TaskTest(BaseTestCase):
         self.assertFalse(job is None)
         self.assertFalse(job.expected_at is None)
 
-    def test_worker(self):
+    def test_work(self):
         queue = self.make_one("jobs")
 
         global test_value
@@ -596,7 +592,7 @@ class TaskTest(BaseTestCase):
         job_handler(26)
 
         self.assertEqual(test_value, 1)
-        Worker(queue).work(True)
+        queue.work(True)
         self.assertEqual(test_value, 27)
 
         del test_value
@@ -620,7 +616,7 @@ class TaskTest(BaseTestCase):
         job_handler(2)
 
         self.assertEqual(test_value, 3)
-        Worker(queue).work(True)
+        queue.work(True)
         self.assertEqual(test_value, 5)
 
         del test_value

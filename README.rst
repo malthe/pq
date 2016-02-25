@@ -203,42 +203,27 @@ encoded as ``ascii`` which should be compatible with any database
 encoding.
 
 
-Handlers
-========
+Tasks
+=====
 
-A callable can be flagged as a ``task`` handler using the ``handler``
-decorator.
-
-Each call is then put within given ``queue``.
+``pq`` comes with a higher level ``API`` that helps to manage ``tasks``.
 
 
 .. code-block:: python
 
-    from pq.handlers import (
-        handler,
-        perform,
-    )
+    from pq.tasks import PQ
 
+    pq = PQ(...)
 
-    @handler(queue, schedule_at='1h')
+    queue = pq['default']
+
+    @queue.task(schedule_at='1h')
     def eat(kind):
         print 'umm, %s apples taste good.' % kind
 
-
     eat('Cox')
 
-
-    for task in queue:
-        if task is not None:
-            perform(task)
-
-
-A ``Worker`` can be initialized to perform available tasks using
-correct ``handlers``:
-
-.. code-block:: python
-
-    Worker(queue).work()
+    queue.work()
 
 
 Thread-safety
