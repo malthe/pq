@@ -280,13 +280,21 @@ class QueueTest(BaseTestCase):
         queue.put({'foo': 'bar'})
         self.assertEqual(len(queue), 1)
         queue.put({'foo': 'bar'}, schedule_at='1s')
-        self.assertEqual(len(queue), 1, 'Length should still be 1 with task scheduled for the future.')
+        self.assertEqual(
+            len(queue),
+            1,
+            'Length should still be 1 with task scheduled for the future.',
+        )
         queue.put({'foo': 'bar'})
         self.assertEqual(len(queue), 2)
         queue.get()
         self.assertEqual(len(queue), 1)
         sleep(1)
-        self.assertEqual(len(queue), 2, 'Length should be back to 2 in the future.')
+        self.assertEqual(
+            len(queue),
+            2,
+            'Length should be back to 2 in the future.',
+        )
 
     def test_benchmark(self, items=1000):
         if not os.environ.get("BENCHMARK"):
@@ -429,18 +437,18 @@ class QueueTest(BaseTestCase):
 
         sys.stderr.write("complete.\n>>> stats: %s ... " % (
             "\n           ".join(
-            "%s: %s" % item for item in (
-                ("threads       ", c),
-                ("consumed      ", consumed),
-                ("remaining     ", len(queue)),
-                ("throughput    ", "%d items/s" % (consumed / elapsed)),
-                ("get           ", "%d items/s" % (get_throughput)),
-                ("put           ", "%d items/s" % (put_throughput)),
-                ("get (mean avg)", "%d μs/item" % (get_latency)),
-                ("put (mean avg)", "%d μs/item" % (put_latency)),
-                ("get (stdev)   ", "%d μs/item" % (get_stdev)),
-                ("put (stdev)   ", "%d μs/item" % (put_stdev)),
-            ))))
+                "%s: %s" % item for item in (
+                    ("threads       ", c),
+                    ("consumed      ", consumed),
+                    ("remaining     ", len(queue)),
+                    ("throughput    ", "%d items/s" % (consumed / elapsed)),
+                    ("get           ", "%d items/s" % (get_throughput)),
+                    ("put           ", "%d items/s" % (put_throughput)),
+                    ("get (mean avg)", "%d μs/item" % (get_latency)),
+                    ("put (mean avg)", "%d μs/item" % (put_latency)),
+                    ("get (stdev)   ", "%d μs/item" % (get_stdev)),
+                    ("put (stdev)   ", "%d μs/item" % (put_stdev)),
+                ))))
 
     def test_producer_consumer_threaded(self):
         queue = self.make_one("test")
