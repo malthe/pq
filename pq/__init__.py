@@ -34,6 +34,7 @@ class PQ(object):
     template_path = os.path.dirname(__file__)
 
     def __init__(self, *args, **kwargs):
+        self.queue_class = kwargs.pop('queue_class', Queue)
         self.params = args, kwargs
         self.queues = WeakValueDictionary()
 
@@ -42,7 +43,7 @@ class PQ(object):
             return self.queues[name]
         except KeyError:
             return self.queues.setdefault(
-                name, Queue(name, *self.params[0], **self.params[1])
+                name, self.queue_class(name, *self.params[0], **self.params[1])
             )
 
     def close(self):
