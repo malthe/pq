@@ -18,7 +18,7 @@ from psycopg2cffi import ProgrammingError
 from psycopg2cffi.extensions import cursor
 
 
-from pq.handlers import (
+from pq.tasks import (
     handler,
     handler_registry,
     perform,
