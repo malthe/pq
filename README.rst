@@ -37,7 +37,7 @@ All functionality is encapsulated in a single class ``PQ``.
 
 Example usage:
 
-::
+.. code-block:: python
 
     from psycopg2 import connect
     from pq import PQ
@@ -53,7 +53,7 @@ You probably want to make sure your database is created with the
 
 To create and configure the queue table, call the ``create()`` method.
 
-::
+.. code-block:: python
 
     pq.create()
 
@@ -68,7 +68,7 @@ Queues
 The ``pq`` object exposes queues through Python's dictionary
 interface:
 
-::
+.. code-block:: python
 
     queue = pq['apples']
 
@@ -76,7 +76,7 @@ The ``queue`` object provides ``get`` and ``put`` methods as explained
 below, and in addition, it also works as a context manager where it
 manages a transaction:
 
-::
+.. code-block:: python
 
     with queue as cursor:
         ...
@@ -93,7 +93,7 @@ Methods
 Use the ``put(data)`` method to insert an item into the queue. It
 takes a JSON-compatible object such as a Python dictionary:
 
-::
+.. code-block:: python
 
     queue.put({'kind': 'Cox'})
     queue.put({'kind': 'Arthur Turner'})
@@ -103,7 +103,7 @@ Items are pulled out of the queue using ``get(block=True)``. The
 default behavior is to block until an item is available with a default
 timeout of one second after which a value of ``None`` is returned.
 
-::
+.. code-block:: python
 
     def eat(kind):
         print 'umm, %s apples taste good.' % kind
@@ -119,7 +119,7 @@ The ``task`` object provides additional metadata in addition to the
 
 The ``get`` operation is also available through iteration:
 
-::
+.. code-block:: python
 
     for task in queue:
         if task is None:
@@ -134,7 +134,7 @@ timeout of one second, after which the iterator yields a value of
 An application can then choose to break out of the loop, or wait again
 for an item to be ready.
 
-::
+.. code-block:: python
 
     for task in queue:
         if task is not None:
@@ -149,7 +149,7 @@ Scheduling
 Items can be scheduled such that they're not pulled until a later
 time:
 
-::
+.. code-block:: python
 
     queue.put({'kind': 'Cox'}, '5m')
 
@@ -163,7 +163,7 @@ Priority
 If some items are more important than others, a time expectation can
 be expressed:
 
-::
+.. code-block:: python
 
     queue.put({'kind': 'Cox'}, expected_at='5m')
 
@@ -173,7 +173,7 @@ an earlier expected time.
 
 The scheduling and priority options can be combined:
 
-::
+.. code-block:: python
 
     queue.put({'kind': 'Cox'}, '1h', '2h')
 
@@ -188,7 +188,7 @@ If a queue name is provided as ``<name>/pickle``
 (e.g. ``'jobs/pickle'``), items are automatically pickled and
 unpickled using Python's built-in ``cPickle`` module:
 
-::
+.. code-block:: python
 
     queue = pq['apples/pickle']
 
