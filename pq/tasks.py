@@ -10,6 +10,8 @@ from . import (
 def task(queue, *job_args, **job_kwargs):
     def decorator(f):
         f._path = "%s.%s" % (f.__module__, f.__name__)
+        f._max_retries = job_kwargs.pop('max_retries', 0)
+        f._retry_in = job_kwargs.pop('retry_in', '30s')
 
         queue.handler_registry[f._path] = f
 
@@ -20,6 +22,7 @@ def task(queue, *job_args, **job_kwargs):
                     function=f._path,
                     args=args,
                     kwargs=kwargs,
+                    retried=0,
                 ),
                 *job_args,
                 **job_kwargs
@@ -34,13 +37,29 @@ class Queue(BaseQueue):
     handler_registry = dict()
     logger = getLogger('pq.tasks')
 
-    def perform(queue, job):
+    def perform(self, job):
         data = job.data
-        return (
-            queue.handler_registry
-            [data['function']]
-            (*data['args'], **data['kwargs'])
-        )
+        f = self.handler_registry[data['function']]
+
+        try:
+            f(*data['args'], **data['kwargs'])
+            return True
+
+        except Exception as e:
+            retried = data['retried']
+
+            if f._max_retries > retried:
+                data.update(dict(
+                    retried=retried + 1,
+                ))
+                id = self.put(data, schedule_at=f._retry_in)
+                self.logger.info("Rescheduled %r as `%s`" % (job, id))
+
+            else:
+                self.logger.warning("Failed to perform job %r :" % job)
+                self.logger.exception(e)
+
+            return False
 
     task = task
 
@@ -55,12 +74,7 @@ class Queue(BaseQueue):
 
                 continue
 
-            try:
-                self.perform(job)
-
-            except Exception as e:
-                self.logger.warning("Failed to perform job %r :" % job)
-                self.logger.exception(e)
+            self.perform(job)
 
 
 class PQ(BasePQ):

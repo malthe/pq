@@ -226,6 +226,15 @@ Tasks
     queue.work()
 
 
+``tasks``'s ``jobs`` can optionally be re-scheduled on failure:
+
+.. code-block:: python
+
+    @queue.task(schedule_at='1h', max_retries=2, retry_in='10s')
+    def eat(kind):
+        # ...
+
+
 Thread-safety
 =============
 

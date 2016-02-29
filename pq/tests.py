@@ -10,7 +10,7 @@ from math import sqrt
 from datetime import datetime, timedelta
 from contextlib import contextmanager
 from unittest import TestCase, SkipTest
-from logging import getLogger, StreamHandler, INFO
+from logging import getLogger, StreamHandler, INFO, CRITICAL
 from threading import Event, Thread, current_thread
 
 from psycopg2cffi.pool import ThreadedConnectionPool
@@ -29,6 +29,9 @@ from pq.tasks import Queue as TaskQueue
 # particular queue instance (via the `logging` flag).
 getLogger('pq').setLevel(INFO)
 getLogger('pq').addHandler(StreamHandler())
+
+# Make rescheduling test suite less verbose
+getLogger('pq.tasks').setLevel(CRITICAL)
 
 
 def mean(values):
@@ -619,4 +622,24 @@ class TaskTest(BaseTestCase):
         queue.work(True)
         self.assertEqual(test_value, 5)
 
+        del test_value
+
+    def test_worker_reschedule_failing_job(self):
+        queue = self.make_one("jobs")
+
+        global test_value
+        test_value = 0
+
+        @queue.task(max_retries=2, retry_in=None)
+        def job_handler(increment):
+            global test_value
+
+            test_value += increment
+            raise Exception()
+
+        job_handler(1)
+
+        queue.work(True)
+
+        self.assertEqual(test_value, 3)
         del test_value
