@@ -10,17 +10,28 @@ from math import sqrt
 from datetime import datetime, timedelta
 from contextlib import contextmanager
 from unittest import TestCase, SkipTest
-from logging import getLogger, StreamHandler, INFO
+from logging import getLogger, StreamHandler, INFO, CRITICAL
 from threading import Event, Thread, current_thread
 
 from psycopg2cffi.pool import ThreadedConnectionPool
 from psycopg2cffi import ProgrammingError
 from psycopg2cffi.extensions import cursor
 
+from pq import (
+    PQ,
+    Queue,
+)
+
+from pq.tasks import Queue as TaskQueue
+
+
 # Set up logging such that we can quickly enable logging for a
 # particular queue instance (via the `logging` flag).
 getLogger('pq').setLevel(INFO)
 getLogger('pq').addHandler(StreamHandler())
+
+# Make rescheduling test suite less verbose
+getLogger('pq.tasks').setLevel(CRITICAL)
 
 
 def mean(values):
@@ -50,15 +61,16 @@ class LoggingCursor(cursor):
 class BaseTestCase(TestCase):
     base_concurrency = 1
 
+    queue_class = Queue
+
     @classmethod
     def setUpClass(cls):
         c = cls.base_concurrency * 4
         pool = cls.pool = ThreadedConnectionPool(
             c, c, "dbname=pq_test user=postgres",
         )
-        from pq import PQ
         cls.pq = PQ(
-            pool=pool, table="queue",
+            pool=pool, table="queue", queue_class=cls.queue_class,
         )
 
         try:
@@ -116,13 +128,14 @@ class QueueTest(BaseTestCase):
         queue.put(5, None, timedelta(seconds=5) + datetime.utcnow())
         t = time()
         self.assertEqual(len(queue), 5)
-        for i, task in enumerate(queue):
-            if task is None:
+        for i, job in enumerate(queue):
+            if job is None:
                 break
 
-            self.assertEqual(i + 1, task.data)
+            self.assertEqual(i + 1, job.data)
             d = time() - t
             self.assertTrue(d < 1)
+            self.assertFalse(job.expected_at is None)
 
         # We expect five plus the empty.
         self.assertEqual(i, 5)
@@ -167,19 +180,19 @@ class QueueTest(BaseTestCase):
     def test_get_and_set(self):
         queue = self.make_one("test")
         queue.put({'foo': 'bar'})
-        task = queue.get()
-        self.assertEqual(task.data, {'foo': 'bar'})
-        task.data = {'foo': 'boo'}
+        job = queue.get()
+        self.assertEqual(job.data, {'foo': 'bar'})
+        job.data = {'foo': 'boo'}
 
         with queue._transaction() as cursor:
             cursor.execute(
                 "SELECT data FROM %s WHERE id = %s",
-                (queue.table, task.id)
+                (queue.table, job.id)
             )
             data = cursor.fetchone()[0]
 
-        self.assertEqual(task.data, data)
-        self.assertIn('size=%d' % len(dumps(data)), repr(task))
+        self.assertEqual(job.data, data)
+        self.assertIn('size=%d' % len(dumps(data)), repr(job))
 
     def test_get_not_empty(self):
         queue = self.make_one("test")
@@ -263,8 +276,8 @@ class QueueTest(BaseTestCase):
         try:
             while True:
                 t = time()
-                i, task = next(iterator)
-                self.assertEqual(data, task.data, (i, time() - t))
+                i, job = next(iterator)
+                self.assertEqual(data, job.data, (i, time() - t))
                 dt.append(time() - t)
                 if i == 5:
                     break
@@ -280,13 +293,21 @@ class QueueTest(BaseTestCase):
         queue.put({'foo': 'bar'})
         self.assertEqual(len(queue), 1)
         queue.put({'foo': 'bar'}, schedule_at='1s')
-        self.assertEqual(len(queue), 1, 'Length should still be 1 with task scheduled for the future.')
+        self.assertEqual(
+            len(queue),
+            1,
+            'Length should still be 1 with job scheduled for the future.',
+        )
         queue.put({'foo': 'bar'})
         self.assertEqual(len(queue), 2)
         queue.get()
         self.assertEqual(len(queue), 1)
         sleep(1)
-        self.assertEqual(len(queue), 2, 'Length should be back to 2 in the future.')
+        self.assertEqual(
+            len(queue),
+            2,
+            'Length should be back to 2 in the future.',
+        )
 
     def test_benchmark(self, items=1000):
         if not os.environ.get("BENCHMARK"):
@@ -429,18 +450,18 @@ class QueueTest(BaseTestCase):
 
         sys.stderr.write("complete.\n>>> stats: %s ... " % (
             "\n           ".join(
-            "%s: %s" % item for item in (
-                ("threads       ", c),
-                ("consumed      ", consumed),
-                ("remaining     ", len(queue)),
-                ("throughput    ", "%d items/s" % (consumed / elapsed)),
-                ("get           ", "%d items/s" % (get_throughput)),
-                ("put           ", "%d items/s" % (put_throughput)),
-                ("get (mean avg)", "%d μs/item" % (get_latency)),
-                ("put (mean avg)", "%d μs/item" % (put_latency)),
-                ("get (stdev)   ", "%d μs/item" % (get_stdev)),
-                ("put (stdev)   ", "%d μs/item" % (put_stdev)),
-            ))))
+                "%s: %s" % item for item in (
+                    ("threads       ", c),
+                    ("consumed      ", consumed),
+                    ("remaining     ", len(queue)),
+                    ("throughput    ", "%d items/s" % (consumed / elapsed)),
+                    ("get           ", "%d items/s" % (get_throughput)),
+                    ("put           ", "%d items/s" % (put_throughput)),
+                    ("get (mean avg)", "%d μs/item" % (get_latency)),
+                    ("put (mean avg)", "%d μs/item" % (put_latency)),
+                    ("get (stdev)   ", "%d μs/item" % (get_stdev)),
+                    ("put (stdev)   ", "%d μs/item" % (put_stdev)),
+                ))))
 
     def test_producer_consumer_threaded(self):
         queue = self.make_one("test")
@@ -484,27 +505,27 @@ class QueueTest(BaseTestCase):
         with queue:
             queue.put({'foo': 'bar'})
 
-        task = queue.get()
-        self.assertEqual(task.data, {'foo': 'bar'})
+        job = queue.get()
+        self.assertEqual(job.data, {'foo': 'bar'})
 
     def test_context_manager_get_and_set(self):
         queue = self.make_one("test")
         queue.put({'foo': 'bar'})
 
         with queue:
-            task = queue.get()
-            self.assertEqual(task.data, {'foo': 'bar'})
-            task.data = {'foo': 'boo'}
+            job = queue.get()
+            self.assertEqual(job.data, {'foo': 'bar'})
+            job.data = {'foo': 'boo'}
 
         with queue as cursor:
             cursor.execute(
                 "SELECT data FROM %s WHERE id = %s",
-                (queue.table, task.id)
+                (queue.table, job.id)
             )
             data = cursor.fetchone()[0]
 
-        self.assertEqual(task.data, data)
-        self.assertIn('size=%d' % len(dumps(data)), repr(task))
+        self.assertEqual(job.data, data)
+        self.assertIn('size=%d' % len(dumps(data)), repr(job))
 
     def test_context_manager_exception(self):
         queue = self.make_one("test")
@@ -516,3 +537,109 @@ class QueueTest(BaseTestCase):
 
         self.assertRaises(ValueError, test)
         self.assertEqual(queue.get(), None)
+
+
+class TaskTest(BaseTestCase):
+    queue_class = TaskQueue
+
+    def test_task(self):
+        queue = self.make_one("jobs")
+
+        self.assertEqual(len(queue.handler_registry), 0)
+
+        global test_value
+        test_value = 0
+
+        @queue.task()
+        def job_handler(increment):
+            global test_value
+            test_value += increment
+            return True
+
+        self.assertEqual(len(queue.handler_registry), 1)
+        self.assertEqual(job_handler._path, 'pq.tests.job_handler')
+        self.assertIn(job_handler._path, queue.handler_registry)
+
+        job_handler(12)
+        self.assertEqual(test_value, 0)
+        self.assertEqual(len(queue), 1)
+        self.assertTrue(queue.perform(queue.get()))
+        self.assertEqual(test_value, 12)
+        del test_value
+
+    def test_task_arguments(self):
+        queue = self.make_one("jobs")
+
+        @queue.task(None, expected_at='1s')
+        def job_handler(value):
+            return value
+
+        job_handler('test')
+
+        job = queue.get()
+        self.assertFalse(job is None)
+        self.assertFalse(job.expected_at is None)
+
+    def test_work(self):
+        queue = self.make_one("jobs")
+
+        global test_value
+        test_value = 1
+
+        @queue.task()
+        def job_handler(increment):
+            global test_value
+            test_value += increment
+            return True
+
+        job_handler(26)
+
+        self.assertEqual(test_value, 1)
+        queue.work(True)
+        self.assertEqual(test_value, 27)
+
+        del test_value
+
+    def test_worker_no_breaking_exception(self):
+        queue = self.make_one("jobs")
+
+        global test_value
+        test_value = 3
+
+        @queue.task()
+        def job_handler(increment):
+            if increment < 0:
+                raise Exception()
+
+            global test_value
+            test_value += increment
+            return True
+
+        job_handler(-100)
+        job_handler(2)
+
+        self.assertEqual(test_value, 3)
+        queue.work(True)
+        self.assertEqual(test_value, 5)
+
+        del test_value
+
+    def test_worker_reschedule_failing_job(self):
+        queue = self.make_one("jobs")
+
+        global test_value
+        test_value = 0
+
+        @queue.task(max_retries=2, retry_in=None)
+        def job_handler(increment):
+            global test_value
+
+            test_value += increment
+            raise Exception()
+
+        job_handler(1)
+
+        queue.work(True)
+
+        self.assertEqual(test_value, 3)
+        del test_value

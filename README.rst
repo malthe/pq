@@ -10,7 +10,7 @@ It allows you to push and pop items in and out of a queue in various
 ways and also provides two scheduling options: delayed processing and
 prioritization.
 
-The system uses a single table that holds all tasks across queues; the
+The system uses a single table that holds all jobs across queues; the
 specifics are easy to customize.
 
 The system currently supports only the `psycopg2
@@ -37,7 +37,7 @@ All functionality is encapsulated in a single class ``PQ``.
 
 Example usage:
 
-::
+.. code-block:: python
 
     from psycopg2 import connect
     from pq import PQ
@@ -53,7 +53,7 @@ You probably want to make sure your database is created with the
 
 To create and configure the queue table, call the ``create()`` method.
 
-::
+.. code-block:: python
 
     pq.create()
 
@@ -68,7 +68,7 @@ Queues
 The ``pq`` object exposes queues through Python's dictionary
 interface:
 
-::
+.. code-block:: python
 
     queue = pq['apples']
 
@@ -76,15 +76,15 @@ The ``queue`` object provides ``get`` and ``put`` methods as explained
 below, and in addition, it also works as a context manager where it
 manages a transaction:
 
-::
+.. code-block:: python
 
     with queue as cursor:
         ...
 
 The statements inside the context manager are either committed as a
 transaction or rejected, atomically. This is useful when a queue is
-used to manage tasks because it allows you to retrieve a task from the
-queue, perform a task and write a result, with transactional
+used to manage jobs because it allows you to retrieve a job from the
+queue, perform a job and write a result, with transactional
 semantics.
 
 Methods
@@ -93,7 +93,7 @@ Methods
 Use the ``put(data)`` method to insert an item into the queue. It
 takes a JSON-compatible object such as a Python dictionary:
 
-::
+.. code-block:: python
 
     queue.put({'kind': 'Cox'})
     queue.put({'kind': 'Arthur Turner'})
@@ -103,29 +103,29 @@ Items are pulled out of the queue using ``get(block=True)``. The
 default behavior is to block until an item is available with a default
 timeout of one second after which a value of ``None`` is returned.
 
-::
+.. code-block:: python
 
     def eat(kind):
         print 'umm, %s apples taste good.' % kind
 
-    task = queue.get()
-    eat(**task.data)
+    job = queue.get()
+    eat(**job.data)
 
-The ``task`` object provides additional metadata in addition to the
+The ``job`` object provides additional metadata in addition to the
 ``data`` attribute as illustrated by the string representation:
 
-    >>> task
-    <pq.Task id=77709 size=1 enqueued_at="2014-02-21T16:22:06Z" schedule_at=None>
+    >>> job
+    <pq.Job id=77709 size=1 enqueued_at="2014-02-21T16:22:06Z" schedule_at=None>
 
 The ``get`` operation is also available through iteration:
 
-::
+.. code-block:: python
 
-    for task in queue:
-        if task is None:
+    for job in queue:
+        if job is None:
             break
 
-        eat(**task.data)
+        eat(**job.data)
 
 The iterator blocks if no item is available. Again, there is a default
 timeout of one second, after which the iterator yields a value of
@@ -134,11 +134,11 @@ timeout of one second, after which the iterator yields a value of
 An application can then choose to break out of the loop, or wait again
 for an item to be ready.
 
-::
+.. code-block:: python
 
-    for task in queue:
-        if task is not None:
-            eat(**task.data)
+    for job in queue:
+        if job is not None:
+            eat(**job.data)
 
         # This is an infinite loop!
 
@@ -149,7 +149,7 @@ Scheduling
 Items can be scheduled such that they're not pulled until a later
 time:
 
-::
+.. code-block:: python
 
     queue.put({'kind': 'Cox'}, '5m')
 
@@ -163,7 +163,7 @@ Priority
 If some items are more important than others, a time expectation can
 be expressed:
 
-::
+.. code-block:: python
 
     queue.put({'kind': 'Cox'}, expected_at='5m')
 
@@ -173,7 +173,7 @@ an earlier expected time.
 
 The scheduling and priority options can be combined:
 
-::
+.. code-block:: python
 
     queue.put({'kind': 'Cox'}, '1h', '2h')
 
@@ -188,7 +188,7 @@ If a queue name is provided as ``<name>/pickle``
 (e.g. ``'jobs/pickle'``), items are automatically pickled and
 unpickled using Python's built-in ``cPickle`` module:
 
-::
+.. code-block:: python
 
     queue = pq['apples/pickle']
 
@@ -201,6 +201,38 @@ unpickled using Python's built-in ``cPickle`` module:
 The old pickle protocol ``0`` is used to ensure the pickled data is
 encoded as ``ascii`` which should be compatible with any database
 encoding.
+
+
+Tasks
+=====
+
+``pq`` comes with a higher level ``API`` that helps to manage ``tasks``.
+
+
+.. code-block:: python
+
+    from pq.tasks import PQ
+
+    pq = PQ(...)
+
+    queue = pq['default']
+
+    @queue.task(schedule_at='1h')
+    def eat(kind):
+        print 'umm, %s apples taste good.' % kind
+
+    eat('Cox')
+
+    queue.work()
+
+
+``tasks``'s ``jobs`` can optionally be re-scheduled on failure:
+
+.. code-block:: python
+
+    @queue.task(schedule_at='1h', max_retries=2, retry_in='10s')
+    def eat(kind):
+        # ...
 
 
 Thread-safety
