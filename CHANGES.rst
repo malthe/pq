@@ -3,13 +3,15 @@ Changes
 
 In next release ..
 
--
+- Added worker class and handler helper decorator.
+  [jeanphix]
 
 
 1.3 (2015-05-11)
 ----------------
 
-- Python 3 compatibility. [migurski]
+- Python 3 compatibility.
+  [migurski]
 
 - Fix time zone issue.
 
