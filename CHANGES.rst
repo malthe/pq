@@ -1,7 +1,8 @@
 Changes
 =======
 
-In next release ..
+1.4 (2016-03-25)
+----------------
 
 - Added worker class and handler helper decorator.
   [jeanphix]

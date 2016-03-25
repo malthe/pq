@@ -15,7 +15,7 @@ from .utils import (
 
 
 __title__ = 'pq'
-__version__ = '1.4-dev'
+__version__ = '1.4'
 __author__ = 'Malthe Borch'
 __license__ = 'BSD'
 
