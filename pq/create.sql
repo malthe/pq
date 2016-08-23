@@ -12,9 +12,15 @@ CREATE TABLE %(name)s (
 
 end $$ language plpgsql;
 
-create index priority_idx on %(name)s
-    (schedule_at nulls first, expected_at nulls first)
-    where dequeued_at is null;
+create index priority_idx_%(name)s on %(name)s
+    (schedule_at nulls first, expected_at nulls first, q_name)
+    where dequeued_at is null
+          and q_name = '%(name)s';
+
+create index priority_idx_no_%(name)s on %(name)s
+    (schedule_at nulls first, expected_at nulls first, q_name)
+    where dequeued_at is null
+          and q_name != '%(name)s';
 
 drop function if exists pq_notify() cascade;
 
