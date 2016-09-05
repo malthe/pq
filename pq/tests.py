@@ -215,6 +215,9 @@ class QueueTest(BaseTestCase):
 
     def test_get_empty_thread_puts(self):
         queue = self.make_one("test")
+        # Add add dequeued task (so table is not empty)
+        queue.put({})
+        queue.get()
 
         def target():
             sleep(0.2)
@@ -257,6 +260,25 @@ class QueueTest(BaseTestCase):
         sleep(0.2)
         self.assertEqual(queue.get(False).data, {'foo': 'bar'})
         thread.join()
+
+    def test_get_before_and_after_tasks_purged(self):
+        queue = self.make_one("test")
+        # Test default
+        self.assertFalse(queue.has_records)
+
+        # Table with dequeued records
+        queue.put({'foo': 'bar'})
+        queue.get()
+        self.assertTrue(queue.has_records)
+
+        # Table with subsequently purged q_name records
+        with queue._transaction() as cursor:
+            cursor.execute(
+                "DELETE FROM %s WHERE q_name = %s",
+                (queue.table, queue.name)
+            )
+        self.assertIsNone(queue.get())
+        self.assertFalse(queue.has_records)
 
     def test_iter(self):
         queue = self.make_one("test")

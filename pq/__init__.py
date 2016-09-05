@@ -166,6 +166,7 @@ class Queue(object):
 
         self.timeout = timeout or self.timeout
         if not self._check_if_has_records():
+            # End immediately to avoid expensive lookup
             time.sleep(self.timeout)
             return None
 
@@ -203,6 +204,8 @@ class Queue(object):
 
             if not self._select(self.last_timeout):
                 block = False
+                # Ensure rows still exist for q_name
+                self._check_if_has_records(refresh=True)
 
     def put(self, data, schedule_at=None, expected_at=None):
         """Put item into queue.
@@ -244,6 +247,7 @@ class Queue(object):
                 "DELETE FROM %s WHERE q_name = %s",
                 (self.table, self.name),
             )
+        self.has_records = False
 
     @contextmanager
     def _conn(self):
@@ -257,12 +261,12 @@ class Queue(object):
     def _listen(self, cursor):
         cursor.execute('LISTEN "%s"', (Literal(self.name), ))
 
-    def _check_if_has_records(self):
+    def _check_if_has_records(self, refresh=False):
         """Checks if any records of q_name exist
 
         :rtype: bool
         """
-        if self.has_records:
+        if self.has_records and not refresh:
             return True
         with self._transaction() as cursor:
             cursor.execute(
