@@ -260,7 +260,7 @@ class Queue(object):
     def _check_if_has_records(self):
         """Checks if any records of q_name exist
 
-        :type: bool
+        :rtype: bool
         """
         if self.has_records:
             return True
