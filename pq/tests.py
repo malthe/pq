@@ -600,6 +600,19 @@ class TaskTest(BaseTestCase):
 
         del test_value
 
+    def test_removed_job(self):
+        queue = self.make_one("jobs")
+
+        @queue.task()
+        def job_handler(value):
+            return value
+
+        del queue.handler_registry[job_handler._path]
+
+        job_handler(42)
+
+        queue.work(True)
+
     def test_worker_no_breaking_exception(self):
         queue = self.make_one("jobs")
 

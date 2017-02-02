@@ -23,6 +23,8 @@ def task(queue, *job_args, **job_kwargs):
                     args=args,
                     kwargs=kwargs,
                     retried=0,
+                    retry_in=f._retry_in,
+                    max_retries=f._max_retries,
                 ),
                 *job_args,
                 **job_kwargs
@@ -37,29 +39,40 @@ class Queue(BaseQueue):
     handler_registry = dict()
     logger = getLogger('pq.tasks')
 
+    def fail(self, job, data, e=None):
+        retried = data['retried']
+
+        if data.get('max_retries', 0) > retried:
+            data.update(dict(
+                retried=retried + 1,
+            ))
+            id = self.put(data, schedule_at=data['retry_in'])
+            self.logger.info("Rescheduled %r as `%s`" % (job, id))
+
+            return False
+
+        self.logger.warning("Failed to perform job %r :" % job)
+        self.logger.exception(e)
+
+        return False
+
     def perform(self, job):
         data = job.data
-        f = self.handler_registry[data['function']]
+        function_path = data['function']
+
+        f = self.handler_registry.get(function_path)
+
+        if f is None:
+            return self.fail(job, data, KeyError(
+                "Job handler `%s` not found." % function_path,
+            ))
 
         try:
             f(*data['args'], **data['kwargs'])
             return True
 
         except Exception as e:
-            retried = data['retried']
-
-            if f._max_retries > retried:
-                data.update(dict(
-                    retried=retried + 1,
-                ))
-                id = self.put(data, schedule_at=f._retry_in)
-                self.logger.info("Rescheduled %r as `%s`" % (job, id))
-
-            else:
-                self.logger.warning("Failed to perform job %r :" % job)
-                self.logger.exception(e)
-
-            return False
+            return self.fail(job, data, e)
 
     task = task
 
