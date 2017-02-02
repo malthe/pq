@@ -580,6 +580,27 @@ class TaskTest(BaseTestCase):
         self.assertFalse(job is None)
         self.assertFalse(job.expected_at is None)
 
+    def test_task_override_job_arguments(self):
+        queue = self.make_one("jobs")
+
+        @queue.task(expected_at='1s')
+        def job_handler(value):
+            return value
+
+        schedule_at = datetime.utcnow() - timedelta(seconds=5)
+        expected_at = datetime.utcnow() + timedelta(seconds=6)
+
+        job_handler(
+            'test',
+            _schedule_at=schedule_at,
+            _expected_at=expected_at,
+        )
+
+        job = queue.get()
+        self.assertFalse(job is None)
+        self.assertEqual(job.expected_at, expected_at)
+        self.assertEqual(job.schedule_at, schedule_at)
+
     def test_work(self):
         queue = self.make_one("jobs")
 

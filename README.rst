@@ -235,6 +235,13 @@ Tasks
         # ...
 
 
+Time expectations can be overriden at ``task`` call:
+
+.. code-block:: python
+
+    eat('Cox', _expected_at='2m', _schedule_at='1m')
+
+
 Thread-safety
 =============
 
