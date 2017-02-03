@@ -7,25 +7,42 @@ from . import (
 )
 
 
-def task(queue, *job_args, **job_kwargs):
+def task(
+    queue,
+    schedule_at=None,
+    expected_at=None,
+    max_retries=0,
+    retry_in='30s',
+):
     def decorator(f):
         f._path = "%s.%s" % (f.__module__, f.__name__)
-        f._max_retries = job_kwargs.pop('max_retries', 0)
-        f._retry_in = job_kwargs.pop('retry_in', '30s')
+        f._max_retries = max_retries
+        f._retry_in = retry_in
 
         queue.handler_registry[f._path] = f
 
         @wraps(f)
-        def wrapper(*args, **kwargs):
+        def wrapper(
+            *args,
+            _schedule_at=None,
+            _expected_at=None,
+            **kwargs
+        ):
+            put_kwargs = dict(
+                schedule_at=_schedule_at or schedule_at,
+                expected_at=_expected_at or expected_at,
+            )
+
             queue.put(
                 dict(
                     function=f._path,
                     args=args,
                     kwargs=kwargs,
                     retried=0,
+                    retry_in=f._retry_in,
+                    max_retries=f._max_retries,
                 ),
-                *job_args,
-                **job_kwargs
+                **put_kwargs
             )
 
         return wrapper
@@ -37,29 +54,40 @@ class Queue(BaseQueue):
     handler_registry = dict()
     logger = getLogger('pq.tasks')
 
+    def fail(self, job, data, e=None):
+        retried = data['retried']
+
+        if data.get('max_retries', 0) > retried:
+            data.update(dict(
+                retried=retried + 1,
+            ))
+            id = self.put(data, schedule_at=data['retry_in'])
+            self.logger.info("Rescheduled %r as `%s`" % (job, id))
+
+            return False
+
+        self.logger.warning("Failed to perform job %r :" % job)
+        self.logger.exception(e)
+
+        return False
+
     def perform(self, job):
         data = job.data
-        f = self.handler_registry[data['function']]
+        function_path = data['function']
+
+        f = self.handler_registry.get(function_path)
+
+        if f is None:
+            return self.fail(job, data, KeyError(
+                "Job handler `%s` not found." % function_path,
+            ))
 
         try:
             f(*data['args'], **data['kwargs'])
             return True
 
         except Exception as e:
-            retried = data['retried']
-
-            if f._max_retries > retried:
-                data.update(dict(
-                    retried=retried + 1,
-                ))
-                id = self.put(data, schedule_at=f._retry_in)
-                self.logger.info("Rescheduled %r as `%s`" % (job, id))
-
-            else:
-                self.logger.warning("Failed to perform job %r :" % job)
-                self.logger.exception(e)
-
-            return False
+            return self.fail(job, data, e)
 
     task = task
 
