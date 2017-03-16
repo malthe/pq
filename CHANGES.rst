@@ -4,7 +4,7 @@ Changes
 1.5 (unrelease)
 ---------------
 
-- ...
+- Fixed Python 2 compatibility.
 
 
 1.4 (2016-03-25)

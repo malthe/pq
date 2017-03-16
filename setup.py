@@ -1,8 +1,17 @@
 """PQ is a transactional queue for PostgreSQL."""
 
-from setuptools import setup, find_packages
-
 import pq
+
+from setuptools import setup, find_packages
+from sys import version
+
+def readfile(name):
+    try:
+        f = open(name, encoding='utf-8')
+    except TypeError:
+        f = open(name)
+    with f:
+        return f.read()
 
 setup(
     name=pq.__title__,
@@ -12,10 +21,7 @@ setup(
     url='https://github.com/malthe/pq/',
     author_email='mborch@gmail.com',
     description=__doc__,
-    long_description='\n\n'.join((
-        open('README.rst', encoding='utf-8').read(),
-        open('CHANGES.rst', encoding='utf-8').read()
-    )),
+    long_description='\n\n'.join(map(readfile, ('README.rst', 'CHANGES.rst'))),
     packages=find_packages(),
     include_package_data=True,
     zip_safe=False,
