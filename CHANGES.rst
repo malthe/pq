@@ -1,8 +1,8 @@
 Changes
 =======
 
-1.5 (unrelease)
----------------
+1.5 (2017-04-18)
+----------------
 
 - Fixed Python 2 compatibility.
 
