@@ -23,6 +23,7 @@ setup(
     description=__doc__,
     long_description='\n\n'.join(map(readfile, ('README.rst', 'CHANGES.rst'))),
     packages=find_packages(),
+    package_data={'': ['create.sql']},
     include_package_data=True,
     zip_safe=False,
     platforms='any',
