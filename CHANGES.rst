@@ -4,7 +4,7 @@ Changes
 1.6 (unreleased)
 ----------------
 
-- ...
+- Fix compatibility with `NamedTupleCursor`.
 
 
 1.5 (2017-04-18)
