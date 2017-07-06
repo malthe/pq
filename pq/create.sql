@@ -22,9 +22,9 @@ create index priority_idx_no_%(name)s on %(name)s
     where dequeued_at is null
           and q_name != '%(name)s';
 
-drop function if exists pq_notify() cascade;
+drop function if exists pq_notify_wrapper() cascade;
 
-create function pq_notify() returns trigger as $$ begin
+create function pq_notify_wrapper() returns trigger as $$ begin
   perform pg_notify(new.q_name, '');
   return null;
 end $$ language plpgsql;
@@ -32,4 +32,4 @@ end $$ language plpgsql;
 create trigger pq_insert
 after insert on %(name)s
 for each row
-execute procedure pq_notify();
+execute procedure pq_notify_wrapper();
