@@ -16,6 +16,7 @@ from threading import Event, Thread, current_thread
 from psycopg2cffi.pool import ThreadedConnectionPool
 from psycopg2cffi import ProgrammingError
 from psycopg2cffi.extensions import cursor
+from psycopg2cffi.extras import NamedTupleCursor
 
 from pq import (
     PQ,
@@ -62,12 +63,14 @@ class BaseTestCase(TestCase):
     base_concurrency = 1
 
     queue_class = Queue
+    CURSOR_FACTORY = None
 
     @classmethod
     def setUpClass(cls):
         c = cls.base_concurrency * 4
         pool = cls.pool = ThreadedConnectionPool(
             c, c, "dbname=pq_test user=postgres",
+            cursor_factory=cls.CURSOR_FACTORY
         )
         cls.pq = PQ(
             pool=pool, table="queue", queue_class=cls.queue_class,
@@ -97,6 +100,17 @@ class BaseTestCase(TestCase):
         self.queues.append(queue)
         queue.clear()
         return queue
+
+
+class CursorTest(BaseTestCase):
+
+    CURSOR_FACTORY = NamedTupleCursor
+
+    def test_get(self):
+        queue = self.make_one("test")
+        queue.put({'foo': 'bar'})
+        job = queue.get()
+        self.assertEqual(job.data, {'foo': 'bar'})
 
 
 class QueueTest(BaseTestCase):

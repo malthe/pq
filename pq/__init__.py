@@ -310,9 +310,9 @@ class Queue(object):
             AND dequeued_at IS NULL
             RETURNING
                id, data, length(data::text),
-               enqueued_at AT TIME ZONE 'utc',
-               schedule_at AT TIME ZONE 'utc',
-               expected_at AT TIME ZONE 'utc',
+               enqueued_at AT TIME ZONE 'utc' AS enqueued_at,
+               schedule_at AT TIME ZONE 'utc' AS schedule_at,
+               expected_at AT TIME ZONE 'utc' AS expected_at,
                (SELECT seconds FROM next_timeout)
 
         If `blocking` is set, the item blocks until an item is ready
