@@ -58,7 +58,7 @@ To create and configure the queue table, call the ``create()`` method.
     pq.create()
 
 The table name defaults to ``'queue'``. To use a different name, pass
-it as a string value as the ``table`` argument for the ```PQ`` class
+it as a string value as the ``table`` argument for the ``PQ`` class
 (illustrated above).
 
 
