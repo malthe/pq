@@ -31,10 +31,12 @@ class PQ(object):
 
     table = 'queue'
 
+    queue_class = Queue
+
     template_path = os.path.dirname(__file__)
 
     def __init__(self, *args, **kwargs):
-        self.queue_class = kwargs.pop('queue_class', Queue)
+        self.queue_class = kwargs.pop('queue_class', self.queue_class)
         self.params = args, kwargs
         self.queues = WeakValueDictionary()
 
