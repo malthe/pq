@@ -1,10 +1,14 @@
 Changes
 =======
 
-1.6 (unreleased)
+1.6 (2018-11-12)
 ----------------
 
 - Fix compatibility with `NamedTupleCursor`.
+
+- Fix duplicate column name issue.
+
+- Add option to specify own queue class.
 
 
 1.5 (2017-04-18)
