@@ -31,7 +31,7 @@ class PQ(object):
 
     table = 'queue'
 
-    queue_class = Queue
+    queue_class = None
 
     template_path = os.path.dirname(__file__)
 
@@ -44,6 +44,9 @@ class PQ(object):
         try:
             return self.queues[name]
         except KeyError:
+            factory = self.queue_class
+            if factory is None:
+                factory = Queue
             return self.queues.setdefault(
                 name, self.queue_class(name, *self.params[0], **self.params[1])
             )
