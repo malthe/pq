@@ -48,7 +48,7 @@ class PQ(object):
             if factory is None:
                 factory = Queue
             return self.queues.setdefault(
-                name, self.queue_class(name, *self.params[0], **self.params[1])
+                name, factory(name, *self.params[0], **self.params[1])
             )
 
     def close(self):
