@@ -1,6 +1,10 @@
 Changes
 =======
 
+In next release ...
+
+- Use `SKIP LOCKED` instead of advisory lock mechanism (PostgreSQL 9.5+).
+
 1.6.1 (2018-11-14)
 ------------------
 
