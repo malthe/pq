@@ -69,7 +69,9 @@ class BaseTestCase(TestCase):
     def setUpClass(cls):
         c = cls.base_concurrency * 4
         pool = cls.pool = ThreadedConnectionPool(
-            c, c, "dbname=pq_test user=postgres",
+            c, c, "dbname=%s user=%s" % (
+                os.environ.get('PQ_TEST_DB', 'pq_test'),
+                os.environ.get('PQ_TEST_USER', 'postgres')),
             cursor_factory=cls.CURSOR_FACTORY
         )
         cls.pq = PQ(
