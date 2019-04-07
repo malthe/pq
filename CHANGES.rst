@@ -1,7 +1,8 @@
 Changes
 =======
 
-In next release ...
+1.7.0 (2019-04-07)
+------------------
 
 - Use `SKIP LOCKED` instead of advisory lock mechanism (PostgreSQL 9.5+).
 
