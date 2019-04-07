@@ -185,8 +185,8 @@ class Queue(object):
                 )
 
             if data is not None:
-                # Reset the timeout if there's no esitmation
-                if seconds is None:
+                # Reset the timeout if there's no estimation
+                if seconds is None or seconds < 0:
                     self.last_timeout = self.timeout
 
                 return Job(
@@ -288,37 +288,35 @@ class Queue(object):
 
         This method uses the following query:
 
-            WITH candidates AS (
-               SELECT id, data,
-                  schedule_at as schedule_at,
-                  expected_at as expected_at
-               FROM %(table)s
-               WHERE q_name = %(name)s AND dequeued_at IS NULL
-               ORDER BY schedule_at nulls first, expected_at nulls first
-               LIMIT 2
-             ),  selected AS (
-               SELECT id FROM candidates
-               WHERE (
-                     schedule_at <= now() OR schedule_at is NULL
-                  )
-                  AND pg_try_advisory_xact_lock(id)
-               ORDER BY schedule_at nulls first, expected_at nulls first
-               LIMIT 1
-            ), next_timeout AS (
-               SELECT MIN(EXTRACT(SECOND FROM (
-                   schedule_at - now()))) AS seconds
-               FROM candidates
-               WHERE schedule_at >= now()
-            )
-            UPDATE %(table)s SET dequeued_at = current_timestamp
-            WHERE id = (SELECT id FROM selected)
-            AND dequeued_at IS NULL
-            RETURNING
-               id, data, length(data::text),
-               enqueued_at AT TIME ZONE 'utc' AS enqueued_at,
-               schedule_at AT TIME ZONE 'utc' AS schedule_at,
-               expected_at AT TIME ZONE 'utc' AS expected_at,
-               (SELECT seconds FROM next_timeout)
+            WITH
+              selected AS (
+                SELECT * FROM %(table)s
+                WHERE
+                  q_name = %(name)s AND
+                  dequeued_at IS NULL
+                ORDER BY schedule_at nulls first, expected_at nulls first
+                FOR UPDATE SKIP LOCKED
+                LIMIT 1
+              ),
+              updated AS (
+                UPDATE %(table)s AS t SET dequeued_at = current_timestamp
+                FROM selected
+                WHERE
+                  t.id = selected.id AND
+                  (t.schedule_at <= now() OR t.schedule_at is NULL)
+                RETURNING t.data, length(t.data::text) AS length
+              )
+            SELECT
+              id,
+              (SELECT data FROM updated),
+              (SELECT length FROM updated),
+              enqueued_at AT TIME ZONE 'utc' AS enqueued_at,
+              schedule_at AT TIME ZONE 'utc' AS schedule_at,
+              expected_at AT TIME ZONE 'utc' AS expected_at,
+              (extract(
+                second FROM (
+                  (SELECT schedule_at - now() FROM selected))))
+            FROM selected
 
         If `blocking` is set, the item blocks until an item is ready
         or the timeout has been reached.
@@ -326,7 +324,6 @@ class Queue(object):
         """
 
         row = cursor.fetchone()
-
         if row is None:
             if blocking:
                 self._listen(cursor)
