@@ -19,8 +19,8 @@ The system currently supports only the `psycopg2
 
 The basic queue implementation is similar to Ryan Smith's
 `queue_classic <https://github.com/ryandotsmith/queue_classic>`_
-library written in Ruby, but uses `advisory locks
-<http://www.postgresql.org/docs/current/static/explicit-locking.html#ADVISORY-LOCKS>`_
+library written in Ruby, but uses `SKIP LOCKED
+<https://www.2ndquadrant.com/en/blog/what-is-select-skip-locked-for-in-postgresql-9-5/>`_
 for concurrency control.
 
 In terms of performance, the implementation clock in at about 1,000
