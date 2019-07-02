@@ -294,7 +294,7 @@ class Queue(object):
                 WHERE
                   q_name = %(name)s AND
                   dequeued_at IS NULL
-                ORDER BY schedule_at nulls first, expected_at nulls first
+                ORDER BY schedule_at nulls first, expected_at nulls last
                 FOR UPDATE SKIP LOCKED
                 LIMIT 1
               ),
