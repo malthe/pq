@@ -140,10 +140,11 @@ class QueueTest(BaseTestCase):
         queue.put(1, None, "1s")
         queue.put(2, None, "2s")
         queue.put(3, None, "3s")
+        queue.put(6)
         queue.put(4, None, timedelta(seconds=4))
         queue.put(5, None, timedelta(seconds=5) + datetime.utcnow())
         t = time()
-        self.assertEqual(len(queue), 5)
+        self.assertEqual(len(queue), 6)
         for i, job in enumerate(queue):
             if job is None:
                 break
@@ -151,10 +152,15 @@ class QueueTest(BaseTestCase):
             self.assertEqual(i + 1, job.data)
             d = time() - t
             self.assertTrue(d < 1)
-            self.assertFalse(job.expected_at is None)
+            is_null = job.expected_at is None
+
+            if job.data == 6:
+                self.assertTrue(is_null)
+            else:
+                self.assertFalse(is_null)
 
         # We expect five plus the empty.
-        self.assertEqual(i, 5)
+        self.assertEqual(i, 6)
 
     def test_put_schedule_at_without_blocking(self):
         queue = self.make_one("test_schedule_at_non_blocking")

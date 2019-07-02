@@ -169,7 +169,8 @@ be expressed:
 
 This tells the queue processor to give priority to this item over an
 item expected at a later time, and conversely, to prefer an item with
-an earlier expected time.
+an earlier expected time. Note that items without a set priority are
+pulled last.
 
 The scheduling and priority options can be combined:
 
