@@ -1,7 +1,8 @@
 Changes
 =======
 
-In next release ...
+1.8.0 (2019-07-03)
+------------------
 
 - Change policy on task priority. Tasks with a null-value for
   `expected_at` are now processed after items that have a value set.
