@@ -1,7 +1,8 @@
 Changes
 =======
 
-In next release ...
+1.8.1 (2019-07-30)
+------------------
 
 - Added overridable `encode` and `decode` methods which are
   responsible for turning task data into `JSON` and vice-versa.
