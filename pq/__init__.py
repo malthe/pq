@@ -1,13 +1,12 @@
 # -*- coding: utf-8 -*-
 import os
+import json
 import sys
 
 from contextlib import contextmanager
 from select import select
 from logging import getLogger
 from weakref import WeakValueDictionary
-
-from json import dumps
 
 from .utils import (
     Literal, prepared, transaction, convert_time_spec, utc_format
@@ -119,6 +118,9 @@ class Queue(object):
 
     dumps = loads = staticmethod(lambda data: data)
 
+    encode = staticmethod(json.dumps)
+    decode = staticmethod(json.loads)
+
     ctx = cursor = None
 
     def __init__(self, name, conn=None, pool=None, table='queue', **kwargs):
@@ -189,8 +191,10 @@ class Queue(object):
                 if seconds is None or seconds < 0:
                     self.last_timeout = self.timeout
 
+                decoded = self.decode(data)
+
                 return Job(
-                    job_id, self.loads(data), size,
+                    job_id, self.loads(decoded), size,
                     enqueued_at, schedule_at, expected_at, self.update
                 )
 
@@ -223,7 +227,7 @@ class Queue(object):
 
         with self._transaction() as cursor:
             return self._put_item(
-                cursor, dumps(self.dumps(data)),
+                cursor, self.encode(self.dumps(data)),
                 utc_format(schedule_at) if schedule_at is not None else None,
                 utc_format(expected_at) if expected_at is not None else None,
             )
@@ -233,7 +237,7 @@ class Queue(object):
 
         with self._transaction() as cursor:
             return self._update_item(
-                cursor, job_id, dumps(self.dumps(data))
+                cursor, job_id, self.encode(self.dumps(data))
             )
 
     def clear(self):
@@ -308,7 +312,7 @@ class Queue(object):
               )
             SELECT
               id,
-              (SELECT data FROM updated),
+              (SELECT data::text FROM updated),
               (SELECT length FROM updated),
               enqueued_at AT TIME ZONE 'utc' AS enqueued_at,
               schedule_at AT TIME ZONE 'utc' AS schedule_at,

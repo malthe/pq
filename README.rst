@@ -182,6 +182,15 @@ This item won't be pulled out until after one hour, and even then,
 it's only processed subject to it's priority of two hours.
 
 
+Encoding and decoding
+=====================
+
+The task data is encoded and decoded into JSON using the built-in
+`json` module. If you want to use a different implementation or need
+to configure this, pass `encode` and/or `decode` arguments to the `PQ`
+constructor.
+
+
 Pickles
 =======
 
@@ -199,9 +208,19 @@ unpickled using Python's built-in ``cPickle`` module:
 
     queue.put(Apple('Cox'))
 
+This allows you to store most objects without having to add any
+further serialization code.
+
 The old pickle protocol ``0`` is used to ensure the pickled data is
 encoded as ``ascii`` which should be compatible with any database
-encoding.
+encoding. Note that the pickle data is still wrapped as a JSON string at the
+database level.
+
+While using the pickle protocol is an easy way to serialize objects,
+for advanced users t might be better to use JSON serialization
+directly on the objects, using for example the object hook mechanism
+in the built-in `json` module or subclassing
+`JSONEncoder <https://docs.python.org/2/library/json.html#json.JSONEncoder>`.
 
 
 Tasks
