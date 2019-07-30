@@ -6,8 +6,9 @@ from contextlib import contextmanager
 from select import select
 from logging import getLogger
 from weakref import WeakValueDictionary
+from psycopg2cffi.extras import register_default_json
 
-from json import dumps
+from json import dumps, loads, JSONEncoder, JSONDecoder
 
 from .utils import (
     Literal, prepared, transaction, convert_time_spec, utc_format
@@ -24,6 +25,16 @@ if sys.version_info[0] == 2:
     import cPickle as pickle
 else:
     import pickle as pickle
+
+
+class PickleEncoder(JSONEncoder):
+    def encode(self, obj):
+        return dumps(pickle.dumps(obj, 0).decode('latin-1'))
+
+
+class PickleDecoder(JSONDecoder):
+    def decode(self, data):
+        return pickle.loads(loads(data).encode('latin-1'))
 
 
 class PQ(object):
@@ -112,22 +123,24 @@ class Queue(object):
             # characters outside of range(128). So, we treat it
             # like Latin-1 so that it can encoded into JSON UTF-8.
             #
-            lambda data: pickle.dumps(data, 0).decode('latin-1'),
-            lambda data: pickle.loads(data.encode('latin-1'))
+            PickleEncoder,
+            PickleDecoder,
             ),
     }
 
-    dumps = loads = staticmethod(lambda data: data)
-
     ctx = cursor = None
 
-    def __init__(self, name, conn=None, pool=None, table='queue', **kwargs):
+    def __init__(self, name, conn=None, pool=None, table='queue',
+                 json_encoder=JSONEncoder, json_decoder=JSONDecoder, **kwargs):
         self.conn = conn
         self.pool = pool
 
         if '/' in name:
             name, key = name.rsplit('/', 1)
-            self.dumps, self.loads = self.converters[key]
+            json_encoder, json_decoder = self.converters[key]
+
+        self.dumps = json_encoder().encode
+        self.loads = json_decoder().decode
 
         self.name = name
         self.table = Literal(table)
@@ -169,6 +182,7 @@ class Queue(object):
 
         while True:
             with self._transaction() as cursor:
+                register_default_json(cursor, loads=self.loads)
                 (
                     job_id,
                     data,
@@ -190,7 +204,7 @@ class Queue(object):
                     self.last_timeout = self.timeout
 
                 return Job(
-                    job_id, self.loads(data), size,
+                    job_id, data, size,
                     enqueued_at, schedule_at, expected_at, self.update
                 )
 
@@ -223,7 +237,7 @@ class Queue(object):
 
         with self._transaction() as cursor:
             return self._put_item(
-                cursor, dumps(self.dumps(data)),
+                cursor, self.dumps(data),
                 utc_format(schedule_at) if schedule_at is not None else None,
                 utc_format(expected_at) if expected_at is not None else None,
             )
@@ -233,7 +247,7 @@ class Queue(object):
 
         with self._transaction() as cursor:
             return self._update_item(
-                cursor, job_id, dumps(self.dumps(data))
+                cursor, job_id, self.dumps(data)
             )
 
     def clear(self):
