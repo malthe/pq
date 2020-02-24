@@ -564,23 +564,26 @@ class QueueTest(BaseTestCase):
 class TaskTest(BaseTestCase):
     queue_class = TaskQueue
 
+    @staticmethod
+    def job(increment):
+        global test_value
+        test_value += increment
+        return True
+
     def test_task(self):
         queue = self.make_one("jobs")
-
-        self.assertEqual(len(queue.handler_registry), 0)
 
         global test_value
         test_value = 0
 
-        @queue.task()
-        def job_handler(increment):
-            global test_value
-            test_value += increment
-            return True
+        # Decorate the static method with our queue task...
+        job_handler = queue.task()(self.__class__.job)
 
-        self.assertEqual(len(queue.handler_registry), 1)
-        self.assertEqual(job_handler._path, 'pq.tests.job_handler')
+        self.assertEqual(job_handler._path, 'pq.tests.TaskTest.job')
         self.assertIn(job_handler._path, queue.handler_registry)
+
+        # Should work without the registry cache...
+        queue.handler_registry.pop(job_handler._path)
 
         job_handler(12)
         self.assertEqual(test_value, 0)
