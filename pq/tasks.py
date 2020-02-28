@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from logging import getLogger
 from functools import wraps
+from pydoc import locate
 from . import (
     PQ as BasePQ,
     Queue as BaseQueue,
@@ -15,7 +16,7 @@ def task(
     retry_in='30s',
 ):
     def decorator(f):
-        f._path = "%s.%s" % (f.__module__, f.__name__)
+        f._path = "%s.%s" % (f.__module__, f.__qualname__)
         f._max_retries = max_retries
         f._retry_in = retry_in
 
@@ -74,6 +75,9 @@ class Queue(BaseQueue):
         function_path = data['function']
 
         f = self.handler_registry.get(function_path)
+
+        if function_path not in self.handler_registry:
+            f = self.handler_registry[function_path] = locate(function_path)
 
         if f is None:
             return self.fail(job, data, KeyError(
