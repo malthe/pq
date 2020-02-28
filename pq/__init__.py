@@ -2,6 +2,7 @@
 import os
 import json
 import sys
+import time
 
 from contextlib import contextmanager
 from select import select
@@ -98,6 +99,8 @@ class Queue(object):
     # returns ``None``.
     timeout = 1
     last_timeout = None
+    # Indicates whether records for q_name exist in tasks table
+    has_records = None
 
     # Keyword arguments passed when creating a new cursor.
     cursor_kwargs = {}
@@ -126,6 +129,7 @@ class Queue(object):
     def __init__(self, name, conn=None, pool=None, table='queue', **kwargs):
         self.conn = conn
         self.pool = pool
+        self.has_records = False
 
         if '/' in name:
             name, key = name.rsplit('/', 1)
@@ -168,6 +172,10 @@ class Queue(object):
         """Pull item from queue."""
 
         self.timeout = timeout or self.timeout
+        if not self._check_if_has_records():
+            # End immediately to avoid expensive lookup
+            time.sleep(self.timeout)
+            return None
 
         while True:
             with self._transaction() as cursor:
@@ -205,6 +213,8 @@ class Queue(object):
 
             if not self._select(self.last_timeout):
                 block = False
+                # Ensure rows still exist for q_name
+                self._check_if_has_records(refresh=True)
 
     def put(self, data, schedule_at=None, expected_at=None):
         """Put item into queue.
@@ -246,6 +256,7 @@ class Queue(object):
                 "DELETE FROM %s WHERE q_name = %s",
                 (self.table, self.name),
             )
+        self.has_records = False
 
     @contextmanager
     def _conn(self):
@@ -258,6 +269,22 @@ class Queue(object):
 
     def _listen(self, cursor):
         cursor.execute('LISTEN "%s"', (Literal(self.name), ))
+
+    def _check_if_has_records(self, refresh=False):
+        """Checks if any records of q_name exist
+
+        :rtype: bool
+        """
+        if self.has_records and not refresh:
+            return True
+        with self._transaction() as cursor:
+            cursor.execute(
+                "SELECT 1 FROM %s WHERE q_name = %s LIMIT 1",
+                (self.table, self.name)
+            )
+            row = cursor.fetchone()
+        self.has_records = True if row else False
+        return self.has_records
 
     @prepared
     def _put_item(self, cursor):
