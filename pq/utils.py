@@ -134,6 +134,7 @@ def transaction(conn, **kwargs):
 
     for notice in cursor.connection.notices:
         logger.warning(notice)
+    cursor.connection.notices.clear()
 
 
 class Literal(object):
