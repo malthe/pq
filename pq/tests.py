@@ -14,7 +14,6 @@ from logging import getLogger, StreamHandler, INFO, CRITICAL
 from threading import Event, Thread, current_thread
 
 from psycopg2cffi.pool import ThreadedConnectionPool
-from psycopg2cffi import ProgrammingError
 from psycopg2cffi.extensions import cursor
 from psycopg2cffi.extras import NamedTupleCursor
 
@@ -81,12 +80,13 @@ class BaseTestCase(TestCase):
             pool=pool, table="queue", queue_class=cls.queue_class,
         )
 
-        try:
-            cls.pq.create()
-        except ProgrammingError as exc:
-            # We ignore a duplicate table error.
-            if exc.pgcode != '42P07':
-                raise
+        # Modify log level while create is executed, to avoid warnings
+        # about already-existing tables and indices.
+        logger = getLogger('pq')
+        level = logger.level
+        logger.setLevel(CRITICAL)
+        cls.pq.create()
+        logger.setLevel(level)
 
     @classmethod
     def tearDownClass(cls):

@@ -1,6 +1,6 @@
 do $$ begin
 
-CREATE TABLE %(name)s (
+CREATE TABLE IF NOT EXISTS %(name)s (
   id          bigserial    PRIMARY KEY,
   enqueued_at timestamptz  NOT NULL DEFAULT current_timestamp,
   dequeued_at timestamptz,
@@ -11,14 +11,27 @@ CREATE TABLE %(name)s (
   data        json         NOT NULL
 );
 
+-- Handle migration from version without q_key column
+BEGIN
+    BEGIN
+        ALTER TABLE %(name)s ADD COLUMN q_key text;
+        UPDATE %(name)s SET q_key = q_name;
+        ALTER TABLE %(name)s ALTER COLUMN q_key SET NOT NULL;
+        ALTER TABLE %(name)s ADD CHECK (length(q_key) > 0);
+        EXCEPTION
+            WHEN duplicate_column THEN 
+                RAISE NOTICE 'column "q_key" already exists, skipping';
+        END;
+    END;
+
 end $$ language plpgsql;
 
-create index priority_idx_%(name)s on %(name)s
+create index if not exists priority_idx_%(name)s on %(name)s
     (schedule_at nulls first, expected_at nulls first, q_name)
     where dequeued_at is null
           and q_name = '%(name)s';
 
-create index priority_idx_no_%(name)s on %(name)s
+create index if not exists priority_idx_no_%(name)s on %(name)s
     (schedule_at nulls first, expected_at nulls first, q_name)
     where dequeued_at is null
           and q_name != '%(name)s';
