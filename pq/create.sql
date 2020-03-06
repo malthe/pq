@@ -7,6 +7,7 @@ CREATE TABLE %(name)s (
   expected_at timestamptz,
   schedule_at timestamptz,
   q_name      text         NOT NULL CHECK (length(q_name) > 0),
+  q_key       text         NOT NULL CHECK (length(q_key) > 0),
   data        json         NOT NULL
 );
 
@@ -25,7 +26,7 @@ create index priority_idx_no_%(name)s on %(name)s
 drop function if exists pq_notify() cascade;
 
 create function pq_notify() returns trigger as $$ begin
-  perform pg_notify(new.q_name, '');
+  perform pg_notify(new.q_key, '');
   return null;
 end $$ language plpgsql;
 
