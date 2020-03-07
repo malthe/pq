@@ -9,7 +9,7 @@ from logging import getLogger
 from weakref import WeakValueDictionary
 
 from .utils import (
-    Literal, prepared, transaction, convert_time_spec, utc_format
+    Literal, prepared, transaction, convert_time_spec, utc_format, unique_identifier
 )
 
 
@@ -132,6 +132,7 @@ class Queue(object):
             self.dumps, self.loads = self.converters[key]
 
         self.name = name
+        self.q_key = unique_identifier(name)
         self.table = Literal(table)
 
         # Set additional options.
@@ -257,14 +258,14 @@ class Queue(object):
             yield self.conn
 
     def _listen(self, cursor):
-        cursor.execute('LISTEN "%s"', (Literal(self.name), ))
+        cursor.execute('LISTEN "%s"', (Literal(self.q_key), ))
 
     @prepared
     def _put_item(self, cursor):
         """Puts a single item into the queue.
 
-            INSERT INTO %(table)s (q_name, data, schedule_at, expected_at)
-            VALUES (%(name)s, $1, $2, $3) RETURNING id
+            INSERT INTO %(table)s (q_name, q_key, data, schedule_at, expected_at)
+            VALUES (%(name)s, %(q_key)s, $1, $2, $3) RETURNING id
 
         This method expects a string argument which is the item data
         and the scheduling timestamp.

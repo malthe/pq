@@ -14,7 +14,6 @@ from logging import getLogger, StreamHandler, INFO, CRITICAL
 from threading import Event, Thread, current_thread
 
 from psycopg2cffi.pool import ThreadedConnectionPool
-from psycopg2cffi import ProgrammingError
 from psycopg2cffi.extensions import cursor
 from psycopg2cffi.extras import NamedTupleCursor
 
@@ -81,12 +80,13 @@ class BaseTestCase(TestCase):
             pool=pool, table="queue", queue_class=cls.queue_class,
         )
 
-        try:
-            cls.pq.create()
-        except ProgrammingError as exc:
-            # We ignore a duplicate table error.
-            if exc.pgcode != '42P07':
-                raise
+        # Modify log level while create is executed, to avoid warnings
+        # about already-existing tables and indices.
+        logger = getLogger('pq')
+        level = logger.level
+        logger.setLevel(CRITICAL)
+        cls.pq.create()
+        logger.setLevel(level)
 
     @classmethod
     def tearDownClass(cls):
@@ -562,6 +562,20 @@ class QueueTest(BaseTestCase):
 
         self.assertRaises(ValueError, test)
         self.assertEqual(queue.get(), None)
+
+    def test_queue_name_with_space(self):
+        queue = self.make_one("test two")
+        queue.put({'foo': 'bar'})
+
+        with self.assertExecutionTime(lambda seconds: 0 < seconds < 0.1):
+            self.assertEqual(queue.get().data, {'foo': 'bar'})
+
+    def test_long_queue_name(self):
+        queue = self.make_one("a_name_longer_than_sixtythree_characters_long_at_least_after_prefixing")
+        queue.put({'foo': 'bar'})
+
+        with self.assertExecutionTime(lambda seconds: 0 < seconds < 0.1):
+            self.assertEqual(queue.get().data, {'foo': 'bar'})
 
 
 class TaskTest(BaseTestCase):

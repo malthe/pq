@@ -8,6 +8,8 @@ from functools import wraps
 from textwrap import dedent
 from logging import getLogger
 from datetime import datetime, timedelta
+from hashlib import sha256
+from base64 import b32encode
 
 
 PY2 = bool(sys.version_info[0] == 2)
@@ -17,6 +19,7 @@ logger = getLogger("pq")
 
 _re_format = re.compile(r'%\(([a-z]+)\)[a-z]')
 _re_timedelta = re.compile(r'(\d+)([smhd])')
+_re_identifier = re.compile(r'^[_a-z][_a-z0-9]*$', re.IGNORECASE)
 _timedelta_table = dict(s='seconds', m='minutes', h='hours', d='days')
 _statements = WeakKeyDictionary()
 
@@ -56,6 +59,7 @@ def prepared(f):
     def wrapper(self, cursor, *args):
         conn = cursor.connection
         name = fname % self.__dict__
+        identifier = unique_identifier(name)
         key = "_prepared_%s" % name
 
         try:
@@ -66,10 +70,10 @@ def prepared(f):
         if key not in prepared:
             prepared.add(key)
             d = self.__dict__.copy()
-            cursor.execute("PREPARE %s AS\n%s" % (name, query), d)
+            cursor.execute("PREPARE %s AS\n%s" % (identifier, query), d)
 
         params = args[:arg_count]
-        statement = "EXECUTE " + name
+        statement = "EXECUTE " + identifier
         if fargs is not None:
             statement += " " + fargs
         cursor.execute(statement, params or None)
@@ -130,6 +134,7 @@ def transaction(conn, **kwargs):
 
     for notice in cursor.connection.notices:
         logger.warning(notice)
+    cursor.connection.notices.clear()
 
 
 class Literal(object):
@@ -152,3 +157,17 @@ class Literal(object):
 
     def getquoted(self):
         return self.s
+
+def unique_identifier(name, prefix='pq_'):
+    """Create a unique identifier from a name and a (non-empty) prefix.
+
+    ValueError is raised if prefix is not a valid postgresql identifier of maximum length 11 characters.
+    """
+
+    if len(prefix) > 11 or not _re_identifier.match(prefix):
+        raise ValueError(prefix)
+
+    # b32encode of 256 bits (32 bytes) is 56 bytes, but the final 4 are always padding ('====')
+    b32_digest = b32encode(sha256(name.encode()).digest())[:52]
+
+    return prefix + b32_digest.decode()
