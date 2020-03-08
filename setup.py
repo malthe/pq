@@ -48,5 +48,5 @@ setup(
         'Topic :: System :: Systems Administration',
     ],
     tests_require=['psycopg2cffi'],
-    test_suite="pq.tests"
+    test_suite='tests'
 )
