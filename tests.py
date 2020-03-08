@@ -596,7 +596,7 @@ class TaskTest(BaseTestCase):
         # Decorate the static method with our queue task...
         job_handler = queue.task()(self.__class__.job)
 
-        self.assertEqual(job_handler._path, 'pq.tests.TaskTest.job')
+        self.assertEqual(job_handler._path, 'tests.TaskTest.job')
         self.assertIn(job_handler._path, queue.handler_registry)
 
         # Should work without the registry cache...
