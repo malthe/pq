@@ -16,6 +16,7 @@ from threading import Event, Thread, current_thread
 from psycopg2cffi.pool import ThreadedConnectionPool
 from psycopg2cffi.extensions import cursor
 from psycopg2cffi.extras import NamedTupleCursor
+from psycopg2cffi import ProgrammingError
 
 from pq import (
     PQ,
