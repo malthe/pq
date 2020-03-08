@@ -577,11 +577,21 @@ class QueueTest(BaseTestCase):
             self.assertEqual(queue.get().data, {'foo': 'bar'})
 
     def test_long_queue_name(self):
-        queue = self.make_one("a_name_longer_than_sixtythree_characters_long_at_least_after_prefixing")
+        queue = self.make_one("a" * 64)
         queue.put({'foo': 'bar'})
 
-        with self.assertExecutionTime(lambda seconds: 0 < seconds < 0.1):
+        with self.assertExecutionTime(lambda seconds: 0 < seconds < 0.1, time()):
             self.assertEqual(queue.get().data, {'foo': 'bar'})
+
+        # The queue is now empty. We expect a timeout when pulling an item
+        # in blocking mode.
+        with self.assertExecutionTime(lambda seconds: 0 < seconds < 0.3, time()):
+            self.assertEqual(queue.get(timeout=0.25), None)
+
+        queue.put({'foo': 'bar'})
+
+        with self.assertExecutionTime(lambda seconds: 0 < seconds < 0.1, time()):
+            self.assertEqual(queue.get(block=False).data, {'foo': 'bar'})
 
 
 class TaskTest(BaseTestCase):

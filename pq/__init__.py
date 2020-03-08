@@ -260,7 +260,7 @@ class Queue(object):
     def _listen(self, cursor):
         name = self.name
         if len(name) > 63:
-            digest = md5(str(name)).hexdigest()
+            digest = md5(name.encode()).hexdigest()
             name = "pq_" + digest
         cursor.execute('LISTEN "%s"', (Literal(name), ))
 
