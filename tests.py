@@ -23,6 +23,7 @@ from pq import (
 )
 
 from pq.tasks import Queue as TaskQueue
+from pq.utils import logger
 
 
 # Set up logging such that we can quickly enable logging for a
@@ -80,13 +81,17 @@ class BaseTestCase(TestCase):
             pool=pool, table="queue", queue_class=cls.queue_class,
         )
 
-        # Modify log level while create is executed, to avoid warnings
-        # about already-existing tables and indices.
-        logger = getLogger('pq')
-        level = logger.level
-        logger.setLevel(CRITICAL)
-        cls.pq.create()
-        logger.setLevel(level)
+        def setup_filter(record):
+            return False
+
+        logger.addFilter(setup_filter)
+        try:
+            cls.pq.create()
+        except ProgrammingError as exc:
+            if exc.pgcode != '42P07':
+                raise
+        finally:
+            logger.removeFilter(setup_filter)
 
     @classmethod
     def tearDownClass(cls):

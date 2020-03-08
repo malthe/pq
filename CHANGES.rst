@@ -1,7 +1,11 @@
 Changes
 =======
 
-In next release ...
+- Added support for queue names longer than 63 characters.
+
+  A database migration (dropping and recreating the `pq_notify`
+  trigger) is required if using names longer than this limit. If not
+  using, then no migration is required.
 
 1.8.1 (2019-07-30)
 ------------------

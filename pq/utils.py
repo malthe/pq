@@ -11,7 +11,6 @@ from datetime import datetime, timedelta
 from hashlib import sha256
 from base64 import b32encode
 
-
 PY2 = bool(sys.version_info[0] == 2)
 
 
@@ -22,6 +21,7 @@ _re_timedelta = re.compile(r'(\d+)([smhd])')
 _re_identifier = re.compile(r'^[_a-z][_a-z0-9]*$', re.IGNORECASE)
 _timedelta_table = dict(s='seconds', m='minutes', h='hours', d='days')
 _statements = WeakKeyDictionary()
+_notices = WeakKeyDictionary()
 
 
 def prepared(f):
@@ -132,9 +132,16 @@ def transaction(conn, **kwargs):
     finally:
         cursor.close()
 
+    try:
+        seen = _notices[cursor.connection]
+    except KeyError:
+        seen = _notices[cursor.connection] = set()
+
     for notice in cursor.connection.notices:
+        if notice in seen:
+            continue
+        seen.add(notice)
         logger.warning(notice)
-    cursor.connection.notices.clear()
 
 
 class Literal(object):
@@ -158,9 +165,9 @@ class Literal(object):
     def getquoted(self):
         return self.s
 
+
 def unique_identifier(name, prefix='pq_'):
     """Create a unique identifier from a name and a (non-empty) prefix.
-
     ValueError is raised if prefix is not a valid postgresql identifier of maximum length 11 characters.
     """
 
