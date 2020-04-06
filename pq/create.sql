@@ -9,12 +9,12 @@ create table if not exists %(name)s (
 );
 
 create index if not exists priority_idx_%(name)s on %(name)s
-    (schedule_at nulls first, expected_at nulls first, q_name)
+      (schedule_at nulls first, expected_at nulls last, q_name)
     where dequeued_at is null
           and q_name = '%(name)s';
 
 create index if not exists priority_idx_no_%(name)s on %(name)s
-    (schedule_at nulls first, expected_at nulls first, q_name)
+    (schedule_at nulls first, expected_at nulls last, q_name)
     where dequeued_at is null
           and q_name != '%(name)s';
 
