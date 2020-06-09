@@ -7,6 +7,8 @@ Changes
   trigger) is required if using names longer than this limit. If not
   using, then no migration is required.
 
+- Return connections to the pool if an exception is raised while it is retrieved
+
 1.8.1 (2019-07-30)
 ------------------
 

@@ -252,8 +252,10 @@ class Queue(object):
     def _conn(self):
         if self.pool:
             conn = self.pool.getconn()
-            yield conn
-            self.pool.putconn(conn)
+            try:
+                yield conn
+            finally:
+                self.pool.putconn(conn)
         else:
             yield self.conn
 

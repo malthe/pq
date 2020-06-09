@@ -123,6 +123,15 @@ class CursorTest(BaseTestCase):
         job = queue.get()
         self.assertEqual(job.data, {'foo': 'bar'})
 
+    def test_returning_connections(self):
+        try:
+            with self.pq['test'] as cursor:
+                self.assertTrue(self.pool._used)
+                raise Exception('test')
+        except:
+            pass
+        self.assertFalse(self.pool._used)
+
 
 class QueueTest(BaseTestCase):
     base_concurrency = 4
