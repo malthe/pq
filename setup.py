@@ -48,6 +48,6 @@ setup(
         'Topic :: System :: Distributed Computing',
         'Topic :: System :: Systems Administration',
     ],
-    tests_require=['psycopg2cffi'],
+    tests_require=['psycopg2cffi', 'wheel'],
     test_suite='tests'
 )
