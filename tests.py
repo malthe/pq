@@ -241,7 +241,8 @@ class QueueTest(BaseTestCase):
         queue.put({'boo': 'baz'}, timedelta(seconds=4) + datetime.utcnow())
 
         # We use a timeout of five seconds for this test.
-        def get(block=True): return queue.get(block, 5)
+        timeout = 5
+        def get(block=True): return queue.get(block, timeout)
 
         # First item is immediately available.
         self.assertEqual(get(False).data, {'bar': 'foo'})
@@ -257,7 +258,7 @@ class QueueTest(BaseTestCase):
 
         # This ensures the timeout has been reset
         with self.assertExecutionTime(
-                lambda seconds: queue.timeout < seconds < queue.timeout + 1,
+                lambda seconds: timeout < seconds < timeout + 1,
                 time(),
         ):
             self.assertEqual(get(), None)
