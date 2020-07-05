@@ -180,6 +180,51 @@ class QueueTest(BaseTestCase):
         # We expect five plus the empty.
         self.assertEqual(i, 6)
 
+    def test_timeout_timing(self):
+        queue = self.make_one("test_timeout_timing")
+        queue.put({'foo': 'bar'}, '6s')
+
+        with self.assertExecutionTime(lambda seconds: 2 < seconds < 3, time()):
+            self.assertEqual(queue.get(timeout=2), None)
+
+        with self.assertExecutionTime(lambda seconds: 1 < seconds < 2, time()):
+            self.assertEqual(queue.get(timeout=1), None)
+
+        with self.assertExecutionTime(lambda seconds: 0 < seconds < 1, time()):
+            self.assertEqual(queue.get(block=False, timeout=0), None)
+
+        with self.assertExecutionTime(lambda seconds: 6 < seconds < 7):
+            self.assertEqual(queue.get(timeout=0).data, {'foo': 'bar'})
+
+    def test_timeout_concurrent(self):
+        # Two simultaneous get(). Ensure the winner gets the item on time, while
+        # the loser honours its timeout value.
+
+        queue = self.make_one("test_timeout_concurrent")
+        queue.put({'bar': 'foo'}, '1s')
+
+        results = [None, None]
+        def target(idx):
+            t0 = time()
+            item = queue.get(timeout=2)
+            results[idx] = (item, time()-t0)
+
+        # One query in other thread, one query in main thread.
+        thread = Thread(target=target, args=(0,))
+        thread.start()
+        target(1)
+        thread.join()
+
+        winner, loser = results if results[1][0] is None else reversed(results)
+
+        # Verify results
+        self.assertTrue(winner[0].data == {'bar': 'foo'})
+        self.assertTrue(loser[0] is None)
+
+        # Verify timings
+        self.assertTrue(1 < winner[1] < 2)
+        self.assertTrue(2 < loser[1] < 3)
+
     def test_put_schedule_at_without_blocking(self):
         queue = self.make_one("test_schedule_at_non_blocking")
         queue.put({'baz': 'fob'}, timedelta(seconds=6))
