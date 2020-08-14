@@ -1,6 +1,9 @@
 Changes
 =======
 
+1.8.2 (2020-08-14)
+------------------
+
 - Added support for queue names longer than 63 characters.
 
   A database migration (dropping and recreating the `pq_notify`
