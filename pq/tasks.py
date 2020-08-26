@@ -32,7 +32,7 @@ def task(
                 expected_at=_expected_at or expected_at,
             )
 
-            queue.put(
+            return queue.put(
                 dict(
                     function=f._path,
                     args=args,
