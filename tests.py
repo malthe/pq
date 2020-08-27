@@ -744,3 +744,13 @@ class TaskTest(BaseTestCase):
 
         self.assertEqual(test_value, 3)
         del test_value
+    
+    def test_task_id(self):
+        queue = self.make_one("jobs_task_id")
+        
+        @queue.task()
+        def job_handler():
+            return True
+        
+        assert job_handler() is not None
+        assert job_handler() + 1 == job_handler()
