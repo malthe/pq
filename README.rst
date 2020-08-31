@@ -238,7 +238,7 @@ Tasks
     queue = pq['default']
 
     @queue.task(schedule_at='1h')
-    def eat(kind):
+    def eat(job_id, kind):
         print 'umm, %s apples taste good.' % kind
 
     eat('Cox')
@@ -251,7 +251,7 @@ Tasks
 .. code-block:: python
 
     @queue.task(schedule_at='1h', max_retries=2, retry_in='10s')
-    def eat(kind):
+    def eat(job_id, kind):
         # ...
 
 
@@ -261,6 +261,8 @@ Time expectations can be overriden at ``task`` call:
 
     eat('Cox', _expected_at='2m', _schedule_at='1m')
 
+
+** NOTE ** First positional argument is id of job. It's PK of record in PostgreSQL.
 
 Thread-safety
 =============
