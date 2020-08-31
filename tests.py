@@ -758,13 +758,18 @@ class TaskTest(BaseTestCase):
     def test_job_id(self):
         queue = self.make_one("jobs_task_executor_job_id")
         
-        current_job_id = None
+        global test_value
+        test_value = 0
+
         @queue.task()
         def job_handler(job_id):
-            global current_job_id
-            current_job_id = job_id
+            global test_value
+            test_value = job_id
         
         new_job_id = job_handler()
         queue.work(True)
+
         self.assertFalse(new_job_id is None)
-        self.assertEqual(current_job_id, new_job_id)
+        self.assertEqual(test_value, new_job_id)
+
+        del test_value
