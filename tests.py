@@ -769,7 +769,7 @@ class TaskTest(BaseTestCase):
         new_job_id = job_handler()
         queue.work(True)
 
-        self.assertFalse(new_job_id is None)
+        self.assertNotEqual(new_job_id, 0)
         self.assertEqual(test_value, new_job_id)
 
         del test_value
