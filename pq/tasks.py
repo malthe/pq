@@ -85,7 +85,7 @@ class Queue(BaseQueue):
             ))
 
         try:
-            f(*data['args'], **data['kwargs'])
+            f(job.id, *data['args'], **data['kwargs'])
             return True
 
         except Exception as e:

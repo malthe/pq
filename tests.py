@@ -607,7 +607,7 @@ class TaskTest(BaseTestCase):
     queue_class = TaskQueue
 
     @staticmethod
-    def job(increment):
+    def job(job_id, increment):
         global test_value
         test_value += increment
         return True
@@ -651,7 +651,7 @@ class TaskTest(BaseTestCase):
         queue = self.make_one("jobs")
 
         @queue.task(expected_at='1s')
-        def job_handler(value):
+        def job_handler(job_id, value):
             return value
 
         schedule_at = datetime.utcnow() - timedelta(seconds=5)
@@ -675,7 +675,7 @@ class TaskTest(BaseTestCase):
         test_value = 1
 
         @queue.task()
-        def job_handler(increment):
+        def job_handler(job_id, increment):
             global test_value
             test_value += increment
             return True
@@ -692,7 +692,7 @@ class TaskTest(BaseTestCase):
         queue = self.make_one("jobs")
 
         @queue.task()
-        def job_handler(value):
+        def job_handler(job_id, value):
             return value
 
         del queue.handler_registry[job_handler._path]
@@ -708,7 +708,7 @@ class TaskTest(BaseTestCase):
         test_value = 3
 
         @queue.task()
-        def job_handler(increment):
+        def job_handler(job_id, increment):
             if increment < 0:
                 raise Exception()
 
@@ -732,7 +732,7 @@ class TaskTest(BaseTestCase):
         test_value = 0
 
         @queue.task(max_retries=2, retry_in=None)
-        def job_handler(increment):
+        def job_handler(job_id, increment):
             global test_value
 
             test_value += increment
@@ -749,8 +749,27 @@ class TaskTest(BaseTestCase):
         queue = self.make_one("jobs_task_id")
         
         @queue.task()
-        def job_handler():
+        def job_handler(job_id):
             return True
         
         assert job_handler() is not None
         assert job_handler() + 1 == job_handler()
+
+    def test_job_id(self):
+        queue = self.make_one("jobs_task_executor_job_id")
+        
+        global test_value
+        test_value = 0
+
+        @queue.task()
+        def job_handler(job_id):
+            global test_value
+            test_value = job_id
+        
+        new_job_id = job_handler()
+        queue.work(True)
+
+        self.assertNotEqual(new_job_id, 0)
+        self.assertEqual(test_value, new_job_id)
+
+        del test_value
