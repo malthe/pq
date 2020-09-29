@@ -1,6 +1,9 @@
 Changes
 =======
 
+1.9.0 (2020-09-29)
+------------------
+
 - The task executor now receives `job_id` as the first argument.
 
 1.8.2 (2020-08-14)
