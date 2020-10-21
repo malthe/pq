@@ -638,7 +638,7 @@ class TaskTest(BaseTestCase):
         queue = self.make_one("jobs")
 
         @queue.task(None, expected_at='1s')
-        def job_handler(value):
+        def job_handler(job_id, value):
             return value
 
         job_handler('test')
