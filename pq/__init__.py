@@ -29,6 +29,8 @@ else:
 class PQ(object):
     """Convenient queue manager."""
 
+    schema = 'public'
+
     table = 'queue'
 
     queue_class = None
@@ -36,7 +38,9 @@ class PQ(object):
     template_path = os.path.dirname(__file__)
 
     def __init__(self, *args, **kwargs):
-        self.queue_class = kwargs.pop('queue_class', self.queue_class)
+        queue_class = kwargs.pop('queue_class', None)
+        if queue_class is not None:
+            self.queue_class = queue_class
         self.params = args, kwargs
         self.queues = WeakValueDictionary()
 
@@ -48,7 +52,7 @@ class PQ(object):
             if factory is None:
                 factory = Queue
             return self.queues.setdefault(
-                name, factory(name, *self.params[0], **self.params[1])
+                name, factory(self.schema, name, *self.params[0], **self.params[1])
             )
 
     def close(self):
@@ -61,7 +65,12 @@ class PQ(object):
             sql = f.read()
 
         with queue._transaction() as cursor:
-            cursor.execute(sql, {'name': Literal(queue.table)})
+            cursor.execute(
+                sql, {
+                    'name': Literal(queue.table),
+                    'schema': Literal(queue.schema),
+                }
+            )
 
 
 class QueueIterator(object):
@@ -124,7 +133,7 @@ class Queue(object):
 
     ctx = cursor = None
 
-    def __init__(self, name, conn=None, pool=None, table='queue', **kwargs):
+    def __init__(self, schema, name, conn=None, pool=None, table='queue', **kwargs):
         self.conn = conn
         self.pool = pool
 
@@ -133,6 +142,7 @@ class Queue(object):
             self.dumps, self.loads = self.converters[key]
 
         self.name = name
+        self.schema = Literal(schema)
         self.table = Literal(table)
 
         # Set additional options.
@@ -244,8 +254,11 @@ class Queue(object):
     def clear(self):
         with self._transaction() as cursor:
             cursor.execute(
-                "DELETE FROM %s WHERE q_name = %s",
-                (self.table, self.name),
+                "DELETE FROM %s.%s WHERE q_name = %s", (
+                    self.schema,
+                    self.table,
+                    self.name
+                )
             )
 
     @contextmanager
@@ -270,7 +283,7 @@ class Queue(object):
     def _put_item(self, cursor):
         """Puts a single item into the queue.
 
-            INSERT INTO %(table)s (q_name, data, schedule_at, expected_at)
+            INSERT INTO %(schema)s.%(table)s (q_name, data, schedule_at, expected_at)
             VALUES (%(name)s, $1, $2, $3) RETURNING id
 
         This method expects a string argument which is the item data
@@ -283,7 +296,7 @@ class Queue(object):
     def _update_item(self, cursor):
         """Updates a single item into the queue.
 
-            UPDATE %(table)s SET data = $2 WHERE id = $1
+            UPDATE %(schema)s.%(table)s SET data = $2 WHERE id = $1
             RETURNING length(data::text)
 
         """
@@ -301,7 +314,7 @@ class Queue(object):
 
             WITH
               selected AS (
-                SELECT * FROM %(table)s
+                SELECT * FROM %(schema)s.%(table)s
                 WHERE
                   q_name = %(name)s AND
                   dequeued_at IS NULL
@@ -310,7 +323,7 @@ class Queue(object):
                 LIMIT 1
               ),
               updated AS (
-                UPDATE %(table)s AS t SET dequeued_at = current_timestamp
+                UPDATE %(schema)s.%(table)s AS t SET dequeued_at = current_timestamp
                 FROM selected
                 WHERE
                   t.id = selected.id AND
@@ -347,7 +360,7 @@ class Queue(object):
     def _count(self, cursor):
         """Return number of items in queue.
 
-            SELECT COUNT(*) FROM %(table)s
+            SELECT COUNT(*) FROM %(schema)s.%(table)s
             WHERE q_name = %(name)s AND dequeued_at IS NULL
               AND (schedule_at IS NULL OR schedule_at <= NOW())
 
