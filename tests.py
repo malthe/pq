@@ -65,6 +65,7 @@ class BaseTestCase(TestCase):
 
     queue_class = Queue
     CURSOR_FACTORY = None
+    KWARGS = {}
 
     @classmethod
     def setUpClass(cls):
@@ -79,7 +80,7 @@ class BaseTestCase(TestCase):
             cursor_factory=cls.CURSOR_FACTORY
         )
         cls.pq = PQ(
-            pool=pool, table="queue", queue_class=cls.queue_class,
+            pool=pool, table="queue", queue_class=cls.queue_class, **cls.KWARGS
         )
 
         def setup_filter(record):
@@ -113,8 +114,20 @@ class BaseTestCase(TestCase):
         return queue
 
 
-class CursorTest(BaseTestCase):
 
+class SchemaTest(BaseTestCase):
+    KWARGS = {
+        "schema": "public"
+    }
+
+    def test_get(self):
+        queue = self.make_one("test")
+        queue.put({'foo': 'bar'})
+        job = queue.get()
+        self.assertEqual(job.data, {'foo': 'bar'})
+
+
+class CursorTest(BaseTestCase):
     CURSOR_FACTORY = NamedTupleCursor
 
     def test_get(self):

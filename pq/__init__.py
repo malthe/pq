@@ -29,8 +29,6 @@ else:
 class PQ(object):
     """Convenient queue manager."""
 
-    schema = 'public'
-
     table = 'queue'
 
     queue_class = None
@@ -52,7 +50,7 @@ class PQ(object):
             if factory is None:
                 factory = Queue
             return self.queues.setdefault(
-                name, factory(self.schema, name, *self.params[0], **self.params[1])
+                name, factory(name, *self.params[0], **self.params[1])
             )
 
     def close(self):
@@ -67,8 +65,8 @@ class PQ(object):
         with queue._transaction() as cursor:
             cursor.execute(
                 sql, {
-                    'name': Literal(queue.table),
-                    'schema': Literal(queue.schema),
+                    'name': Literal(queue.name),
+                    'table': queue.table,
                 }
             )
 
@@ -133,7 +131,7 @@ class Queue(object):
 
     ctx = cursor = None
 
-    def __init__(self, schema, name, conn=None, pool=None, table='queue', **kwargs):
+    def __init__(self, name, conn=None, pool=None, table='queue', schema=None, **kwargs):
         self.conn = conn
         self.pool = pool
 
@@ -142,8 +140,7 @@ class Queue(object):
             self.dumps, self.loads = self.converters[key]
 
         self.name = name
-        self.schema = Literal(schema)
-        self.table = Literal(table)
+        self.table = Literal((schema + "." if schema else "") + table)
 
         # Set additional options.
         self.__dict__.update(kwargs)
@@ -254,8 +251,7 @@ class Queue(object):
     def clear(self):
         with self._transaction() as cursor:
             cursor.execute(
-                "DELETE FROM %s.%s WHERE q_name = %s", (
-                    self.schema,
+                "DELETE FROM %s WHERE q_name = %s", (
                     self.table,
                     self.name
                 )
@@ -283,7 +279,7 @@ class Queue(object):
     def _put_item(self, cursor):
         """Puts a single item into the queue.
 
-            INSERT INTO %(schema)s.%(table)s (q_name, data, schedule_at, expected_at)
+            INSERT INTO %(table)s (q_name, data, schedule_at, expected_at)
             VALUES (%(name)s, $1, $2, $3) RETURNING id
 
         This method expects a string argument which is the item data
@@ -296,7 +292,7 @@ class Queue(object):
     def _update_item(self, cursor):
         """Updates a single item into the queue.
 
-            UPDATE %(schema)s.%(table)s SET data = $2 WHERE id = $1
+            UPDATE %(table)s SET data = $2 WHERE id = $1
             RETURNING length(data::text)
 
         """
@@ -314,7 +310,7 @@ class Queue(object):
 
             WITH
               selected AS (
-                SELECT * FROM %(schema)s.%(table)s
+                SELECT * FROM %(table)s
                 WHERE
                   q_name = %(name)s AND
                   dequeued_at IS NULL
@@ -323,7 +319,7 @@ class Queue(object):
                 LIMIT 1
               ),
               updated AS (
-                UPDATE %(schema)s.%(table)s AS t SET dequeued_at = current_timestamp
+                UPDATE %(table)s AS t SET dequeued_at = current_timestamp
                 FROM selected
                 WHERE
                   t.id = selected.id AND
@@ -360,7 +356,7 @@ class Queue(object):
     def _count(self, cursor):
         """Return number of items in queue.
 
-            SELECT COUNT(*) FROM %(schema)s.%(table)s
+            SELECT COUNT(*) FROM %(table)s
             WHERE q_name = %(name)s AND dequeued_at IS NULL
               AND (schedule_at IS NULL OR schedule_at <= NOW())
 
