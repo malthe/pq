@@ -33,7 +33,7 @@ Getting started
 
 All functionality is encapsulated in a single class ``PQ``.
 
-     ``class PQ(conn=None, pool=None, table='queue', debug=False)``
+     ``class PQ(conn=None, pool=None, table='queue')``
 
 Example usage:
 
