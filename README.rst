@@ -61,6 +61,9 @@ The table name defaults to ``'queue'``. To use a different name, pass
 it as a string value as the ``table`` argument for the ``PQ`` class
 (illustrated above).
 
+The optional ``schema`` argument can be used to qualify the table with
+a schema if necessary.
+
 
 Queues
 ======
