@@ -33,7 +33,10 @@ Getting started
 
 All functionality is encapsulated in a single class ``PQ``.
 
-     ``class PQ(conn=None, pool=None, table='queue', debug=False)``
+     ``class PQ(conn=None, pool=None, table="queue", schema=None)``
+
+The optional ``schema`` argument can be used to qualify the table with
+a schema if necessary.
 
 Example usage:
 
@@ -56,10 +59,6 @@ To create and configure the queue table, call the ``create()`` method.
 .. code-block:: python
 
     pq.create()
-
-The table name defaults to ``'queue'``. To use a different name, pass
-it as a string value as the ``table`` argument for the ``PQ`` class
-(illustrated above).
 
 
 Queues

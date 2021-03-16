@@ -36,7 +36,9 @@ class PQ(object):
     template_path = os.path.dirname(__file__)
 
     def __init__(self, *args, **kwargs):
-        self.queue_class = kwargs.pop('queue_class', self.queue_class)
+        queue_class = kwargs.pop('queue_class', None)
+        if queue_class is not None:
+            self.queue_class = queue_class
         self.params = args, kwargs
         self.queues = WeakValueDictionary()
 
@@ -61,7 +63,12 @@ class PQ(object):
             sql = f.read()
 
         with queue._transaction() as cursor:
-            cursor.execute(sql, {'name': Literal(queue.table)})
+            cursor.execute(
+                sql, {
+                    'name': Literal(queue.name),
+                    'table': queue.table,
+                }
+            )
 
 
 class QueueIterator(object):
@@ -124,7 +131,7 @@ class Queue(object):
 
     ctx = cursor = None
 
-    def __init__(self, name, conn=None, pool=None, table='queue', **kwargs):
+    def __init__(self, name, conn=None, pool=None, table='queue', schema=None, **kwargs):
         self.conn = conn
         self.pool = pool
 
@@ -133,7 +140,7 @@ class Queue(object):
             self.dumps, self.loads = self.converters[key]
 
         self.name = name
-        self.table = Literal(table)
+        self.table = Literal((schema + "." if schema else "") + table)
 
         # Set additional options.
         self.__dict__.update(kwargs)
@@ -244,8 +251,10 @@ class Queue(object):
     def clear(self):
         with self._transaction() as cursor:
             cursor.execute(
-                "DELETE FROM %s WHERE q_name = %s",
-                (self.table, self.name),
+                "DELETE FROM %s WHERE q_name = %s", (
+                    self.table,
+                    self.name
+                )
             )
 
     @contextmanager

@@ -3,7 +3,7 @@ Changes
 
 In next release ...
 
--
+- Add support for using a custom schema (issue #35).
 
 1.9.0 (2020-09-29)
 ------------------

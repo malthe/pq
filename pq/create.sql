@@ -1,4 +1,4 @@
-create table if not exists %(name)s (
+create table if not exists %(table)s (
   id          bigserial    PRIMARY KEY,
   enqueued_at timestamptz  NOT NULL DEFAULT current_timestamp,
   dequeued_at timestamptz,
@@ -8,12 +8,12 @@ create table if not exists %(name)s (
   data        json         NOT NULL
 );
 
-create index if not exists priority_idx_%(name)s on %(name)s
+create index if not exists priority_idx_%(name)s on %(table)s
       (schedule_at nulls first, expected_at nulls last, q_name)
     where dequeued_at is null
           and q_name = '%(name)s';
 
-create index if not exists priority_idx_no_%(name)s on %(name)s
+create index if not exists priority_idx_no_%(name)s on %(table)s
     (schedule_at nulls first, expected_at nulls last, q_name)
     where dequeued_at is null
           and q_name != '%(name)s';
@@ -32,6 +32,6 @@ create function pq_notify() returns trigger as $$ begin
 end $$ language plpgsql;
 
 create trigger pq_insert
-after insert on %(name)s
+after insert on %(table)s
 for each row
 execute procedure pq_notify();
