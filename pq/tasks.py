@@ -77,7 +77,12 @@ class Queue(BaseQueue):
         f = self.handler_registry.get(function_path)
 
         if function_path not in self.handler_registry:
-            f = self.handler_registry[function_path] = locate(function_path)
+            f = locate(function_path)
+            
+            if hasattr(f, "__wrapped__"):
+                f = f.__wrapped__
+                
+            self.handler_registry[function_path] = f
 
         if f is None:
             return self.fail(job, data, KeyError(
