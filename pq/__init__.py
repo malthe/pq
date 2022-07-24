@@ -211,7 +211,7 @@ class Queue(object):
 
             self.last_timeout = min(self.last_timeout, self.timeout)
 
-            if not self._select(self.last_timeout):
+            if not self._select(float(self.last_timeout)):
                 block = False
 
     def put(self, data, schedule_at=None, expected_at=None):
