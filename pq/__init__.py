@@ -8,6 +8,7 @@ from select import select
 from logging import getLogger
 from hashlib import md5
 from weakref import WeakValueDictionary
+from time import time
 
 from .utils import (
     Literal, prepared, transaction, convert_time_spec, utc_format
@@ -101,11 +102,10 @@ class QueueIterator(object):
 class Queue(object):
     """Simple thread-safe transactional queue."""
 
-    # This timeout is used during iteration. If the timeout elapses
-    # and no item was pulled from the queue, the iteration loop
-    # returns ``None``.
+    # The default timeout used during iteration, if an explicit timeout is not
+    # passed to get(). If the timeout elapses and no item was pulled from the
+    # queue, the iteration loop returns ``None``.
     timeout = 1
-    last_timeout = None
 
     # Keyword arguments passed when creating a new cursor.
     cursor_kwargs = {}
@@ -173,9 +173,21 @@ class Queue(object):
             self.pool.closeall()
 
     def get(self, block=True, timeout=None):
-        """Pull item from queue."""
+        """Pull item from queue.
 
-        self.timeout = timeout or self.timeout
+        If the 'block' parameter is set (default), then the call will block
+        until an item is available or the timeout is reached. The default
+        timeout is 1 second; a timeout of 0 will block indefinitely.
+
+        If 'block' is False, the timeout setting is ignored and the call returns
+        immediately.
+
+        Returns None if no item is scheduled by the time the function returns.
+        """
+
+        if timeout is None:
+            timeout = self.timeout
+        deadline = time() + timeout # only used if timeout != 0 (not indefinite)
 
         while True:
             with self._transaction() as cursor:
@@ -190,15 +202,8 @@ class Queue(object):
                 ) = self._pull_item(
                     cursor, block
                 )
-                self.last_timeout = (
-                    seconds or self.last_timeout or self.timeout
-                )
 
             if data is not None:
-                # Reset the timeout if there's no estimation
-                if seconds is None or seconds < 0:
-                    self.last_timeout = self.timeout
-
                 decoded = self.decode(data)
 
                 return Job(
@@ -206,13 +211,25 @@ class Queue(object):
                     enqueued_at, schedule_at, expected_at, self.update
                 )
 
-            if not block:
-                return
+            cur_timeout = 0 if timeout == 0 else deadline - time()
 
-            self.last_timeout = min(self.last_timeout, self.timeout)
+            if not block or cur_timeout < 0:
+                return None
 
-            if not self._select(self.last_timeout):
-                block = False
+            if seconds is not None:
+                if seconds > 0:
+                    # An item awaiting schedule_at, don't wait past it
+                    cur_timeout = seconds if timeout == 0 else min(cur_timeout, seconds)
+                else:
+                    # Unclear: is it possible that seconds <= 0 and still no
+                    # item is returned above?  What does it mean? For now, redo
+                    # query immediately to either pull the item or get a new
+                    # estimate.
+                    self.logger.debug(f'unexpected estimate {seconds}s, redo query')
+                    continue
+
+            # Block until something happens, or timeout
+            self._select(cur_timeout)
 
     def put(self, data, schedule_at=None, expected_at=None):
         """Put item into queue.
