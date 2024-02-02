@@ -1,4 +1,4 @@
-name: PQ
+name: ci
 
 # PostgreSQL support taken from:
 #   https://github.com/actions/example-services/blob/master/.github/workflows/postgres-service.yml
@@ -6,14 +6,17 @@ name: PQ
 on: [push, pull_request]
 
 jobs:
-  ci:
+  python:
     runs-on: ubuntu-latest
 
     strategy:
       matrix:
-        python-version: [ '3.x', 'pypy3' ]
-        postgres-version: [ '9', 'latest' ]
-
+        python-version:
+        - "3.9"
+        - "pypy-3.9"
+        postgres-version:
+        - "9"
+        - "latest"
     services:
       postgres:
         image: postgres:${{ matrix.postgres-version }}
@@ -29,10 +32,12 @@ jobs:
 
     steps:
     - uses: actions/checkout@master
-    - uses: actions/setup-python@v2
+    - uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
-    - run: python -m pip install --upgrade pip setuptools wheel && python setup.py test
+    - run: |
+        cd python
+        python -m pip install --upgrade pip setuptools wheel && python setup.py test
       env:
         PQ_TEST_DB_PORT: ${{ job.services.postgres.ports[5432] }}
         PQ_TEST_DB_HOST: localhost
